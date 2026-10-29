@@ -56,6 +56,8 @@ npm run preview
 
 `.github/workflows/pages.yml`が`main`または`master`へのpush時にビルドし、GitHub Pagesへ公開します。初回実行時はGitHub ActionsからPagesの有効化も試みます。
 
+公開URL: https://bashio44.github.io/PICO-Synth/
+
 1. このプロジェクトをGitHubリポジトリへpushします。
 2. Actionsから **Deploy to GitHub Pages** を実行し、完了後にPagesのURLを確認します。
 3. リポジトリまたはOrganizationの設定でActionsによるPages有効化が許可されていない場合は、**Settings → Pages → Build and deployment** で **GitHub Actions** を選びます。
