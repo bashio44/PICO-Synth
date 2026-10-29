@@ -16,6 +16,15 @@ import {
 } from "./model/effects";
 import { EffectsGraphBuilder } from "./audio/effects-graph";
 import { parseAppSettings, stringifyAppSettings } from "./model/app-config";
+import {
+  formatEnvelopeControl,
+  lfoFrequencyToSlider,
+  lfoSliderToFrequency,
+  normalizeEnvelopeControl,
+  type EnvelopeControl
+} from "./model/controls";
+import { pianoNoteForKey } from "./ui/keyboard";
+import { effectPreviewSvg, waveformPath } from "./ui/visualizations";
 
 const engine = new AudioEngine();
 const midiPlayer = new MidiPlayer(engine);
@@ -45,6 +54,7 @@ function oscillatorCard(index: number): string {
       <select id="wave-${index}" data-osc="${index}" data-prop="waveform" aria-label="オシレーター${index + 1}の波形 Waveform">
         ${waveformValues.map((wave) => `<option value="${wave}" ${oscillator.waveform === wave ? "selected" : ""}>${waveformNames[wave]}</option>`).join("")}
       </select>
+      <div class="waveform-visual"><span>信号の形</span><svg viewBox="0 0 200 48" aria-hidden="true"><path id="wave-visual-${index}" d="${waveformPath(oscillator.waveform)}"></path></svg></div>
       <div class="range-row"><label for="volume-${index}"><span class="parameter-name">音量</span><span class="parameter-term">Level (Volume)</span></label><input id="volume-${index}" type="range" min="0" max="1" step="0.01" value="${oscillator.volume}" data-osc="${index}" data-prop="volume" aria-label="オシレーター${index + 1}の音量 (Level, Volume)"><output>${Math.round(oscillator.volume * 100)}%</output></div>
       <div class="tune-row">
         <label for="semitone-${index}"><span class="parameter-name">音程 <span class="helper">半音</span></span><span class="parameter-term">Coarse Tune</span></label>
@@ -81,9 +91,9 @@ app.innerHTML = `
       <section class="panel card" aria-labelledby="env-title">
         <div class="panel-heading"><div><p class="eyebrow">SHAPE THE VOLUME</p><h2 id="env-title">音のふくらみをつくろう</h2></div><span class="step-badge badge-mint">02 · ADSR · Envelope</span></div>
         <p class="panel-copy">音が大きくなって、続いて、小さくなる形をえがこう。</p>
-        <div class="envelope-graph"><svg id="envelope-svg" viewBox="0 0 400 130" role="img" aria-label="音量エンベロープ。丸い点をドラッグして形を変えられます"><path id="envelope-path" d=""></path><circle id="handle-attack" class="envelope-handle" data-handle="attack" r="7" tabindex="0" role="slider" aria-valuemin="0.01" aria-valuemax="5" aria-label="アタック時間 Attack を調整"></circle><circle id="handle-sustain" class="envelope-handle" data-handle="sustain" r="7" tabindex="0" role="slider" aria-valuemin="0" aria-valuemax="100" aria-label="サステイン量 Sustain を調整"></circle><circle id="handle-release" class="envelope-handle" data-handle="release" r="7" tabindex="0" role="slider" aria-valuemin="0.01" aria-valuemax="5" aria-label="リリース時間 Release を調整"></circle></svg><div class="envelope-stages" aria-hidden="true"><span>押す<small>Note On</small></span><span>ふくらむ<small>Attack</small></span><span>保つ<small>Sustain</small></span><span>はなす<small>Release</small></span></div></div>
+        <div class="envelope-graph"><svg id="envelope-svg" viewBox="0 0 400 130" role="img" aria-label="音量エンベロープ。丸い点をドラッグして形を変えられます"><path class="envelope-grid" d="M24 25 H376 M24 60 H376 M24 96 H376 M110 18 V102 M200 18 V102 M290 18 V102"></path><path id="envelope-path" d=""></path><text class="envelope-axis" x="27" y="17">音量</text><text class="envelope-axis" x="355" y="119">時間</text><circle id="handle-attack" class="envelope-handle" data-handle="attack" r="7" tabindex="0" role="slider" aria-valuemin="0.01" aria-valuemax="5" aria-label="アタック時間 Attack を調整"></circle><circle id="handle-sustain" class="envelope-handle" data-handle="sustain" r="7" tabindex="0" role="slider" aria-valuemin="0" aria-valuemax="100" aria-label="サステイン量 Sustain を調整"></circle><circle id="handle-release" class="envelope-handle" data-handle="release" r="7" tabindex="0" role="slider" aria-valuemin="0.01" aria-valuemax="5" aria-label="リリース時間 Release を調整"></circle></svg><div class="envelope-stages" aria-hidden="true"><span>押す<small>Note On</small></span><span>ふくらむ<small>Attack</small></span><span>保つ<small>Sustain</small></span><span>はなす<small>Release</small></span></div></div>
         <div class="adsr-grid">
-          ${(["attack", "decay", "sustain", "release"] as const).map((part, i) => `<label class="adsr-field" for="env-${part}"><span>${["A", "D", "S", "R"][i]} <small>${["ふくらむ", "落ち着く", "保つ", "消える"][i]}</small><span class="parameter-term">${["Attack", "Decay", "Sustain", "Release"][i]}</span></span><span class="number-with-unit"><input id="env-${part}" type="number" min="${part === "sustain" ? 0 : 0.01}" max="${part === "sustain" ? 100 : 5}" step="${part === "sustain" ? 1 : 0.01}" value="${part === "sustain" ? Math.round(settings.envelope[part] * 100) : settings.envelope[part]}" data-envelope="${part}" aria-label="${["ふくらむ Attack", "落ち着く Decay", "保つ Sustain", "消える Release"][i]}"><span>${part === "sustain" ? "%" : "秒"}</span></span></label>`).join("")}
+          ${(["attack", "decay", "sustain", "release"] as const).map((part, i) => `<label class="adsr-field" for="env-${part}"><span>${["A", "D", "S", "R"][i]} <small>${["ふくらむ", "落ち着く", "保つ", "消える"][i]}</small><span class="parameter-term">${["Attack", "Decay", "Sustain", "Release"][i]}</span></span><span class="number-with-unit"><input id="env-${part}" type="number" min="${part === "sustain" ? 0 : 0.01}" max="${part === "sustain" ? 100 : 5}" step="0.01" value="${formatEnvelopeControl(part, settings.envelope[part])}" data-envelope="${part}" aria-label="${["ふくらむ Attack", "落ち着く Decay", "保つ Sustain", "消える Release"][i]}"><span>${part === "sustain" ? "%" : "秒"}</span></span></label>`).join("")}
         </div>
       </section>
       <section class="panel card" aria-labelledby="lfo-title">
@@ -93,16 +103,17 @@ app.innerHTML = `
           ${(["pitchLfo", "volumeLfo"] as const).map((key) => {
             const lfo = settings[key];
             const pitch = key === "pitchLfo";
-            return `<article class="control-card lfo-card"><div class="lfo-title-row"><label class="switch-label" for="${key}-enabled"><input id="${key}-enabled" type="checkbox" data-lfo="${key}" data-prop="enabled" ${lfo.enabled ? "checked" : ""}><span class="switch"></span><span class="parameter-pair"><span>${pitch ? "音程のゆらぎ" : "音量のゆらぎ"}</span><span class="parameter-term">${pitch ? "Pitch LFO · On / Off" : "Amplitude LFO (Tremolo) · On / Off"}</span></span></label><span class="lfo-icon">${pitch ? "↕" : "〰"}</span></div><label class="field-label" for="${key}-wave"><span class="parameter-name">ゆらぎの形</span><span class="parameter-term">Waveform</span></label><select id="${key}-wave" data-lfo="${key}" data-prop="waveform"><option value="sine" ${lfo.waveform === "sine" ? "selected" : ""}>なめらか / Sine</option><option value="triangle" ${lfo.waveform === "triangle" ? "selected" : ""}>三角 / Triangle</option><option value="square" ${lfo.waveform === "square" ? "selected" : ""}>カクカク / Square</option><option value="sawtooth" ${lfo.waveform === "sawtooth" ? "selected" : ""}>ノコギリ / Sawtooth</option></select><div class="range-row"><label for="${key}-freq"><span class="parameter-name">速さ（Hz）</span><span class="parameter-term">Rate (Frequency)</span></label><input id="${key}-freq" type="range" min="0.1" max="2000" step="0.1" value="${lfo.frequency}" data-lfo="${key}" data-prop="frequency" aria-label="ゆらぎの速さ Rate, Frequency"><output>${lfo.frequency} Hz</output></div><div class="range-row compact"><label for="${key}-depth"><span class="parameter-name">深さ</span><span class="parameter-term">Depth</span></label><input id="${key}-depth" type="range" min="0" max="${pitch ? 200 : 0.5}" step="${pitch ? 1 : 0.01}" value="${lfo.depth}" data-lfo="${key}" data-prop="depth" aria-label="ゆらぎの深さ Depth"><output>${lfo.depth}${pitch ? "¢" : ""}</output></div></article>`;
+            return `<article class="control-card lfo-card"><div class="lfo-title-row"><label class="switch-label" for="${key}-enabled"><input id="${key}-enabled" type="checkbox" data-lfo="${key}" data-prop="enabled" ${lfo.enabled ? "checked" : ""}><span class="switch"></span><span class="parameter-pair"><span>${pitch ? "音程のゆらぎ" : "音量のゆらぎ"}</span><span class="parameter-term">${pitch ? "Pitch LFO · On / Off" : "Amplitude LFO (Tremolo) · On / Off"}</span></span></label><span class="lfo-icon" aria-hidden="true">${pitch ? "↕" : "〰"}</span></div><div class="lfo-wave-visual"><svg viewBox="0 0 200 48" aria-hidden="true"><path id="${key}-wave-visual" d="${waveformPath(lfo.waveform)}"></path></svg></div><label class="field-label" for="${key}-wave"><span class="parameter-name">ゆらぎの形</span><span class="parameter-term">Waveform</span></label><select id="${key}-wave" data-lfo="${key}" data-prop="waveform"><option value="sine" ${lfo.waveform === "sine" ? "selected" : ""}>なめらか / Sine</option><option value="triangle" ${lfo.waveform === "triangle" ? "selected" : ""}>三角 / Triangle</option><option value="square" ${lfo.waveform === "square" ? "selected" : ""}>カクカク / Square</option><option value="sawtooth" ${lfo.waveform === "sawtooth" ? "selected" : ""}>ノコギリ / Sawtooth</option></select><div class="range-row lfo-range-row"><label for="${key}-freq"><span class="parameter-name">速さ（Hz）</span><span class="parameter-term">Rate · 対数スケール</span></label><input id="${key}-freq" type="range" min="0" max="10000" step="1" value="${lfoFrequencyToSlider(lfo.frequency)}" data-lfo="${key}" data-prop="frequency" aria-label="ゆらぎの速さ Rate, 0.1から2000ヘルツ"><output>${lfo.frequency} Hz</output></div><div class="range-row lfo-range-row compact"><label for="${key}-depth"><span class="parameter-name">深さ</span><span class="parameter-term">Depth</span></label><input id="${key}-depth" type="range" min="0" max="${pitch ? 200 : 0.5}" step="${pitch ? 1 : 0.01}" value="${lfo.depth}" data-lfo="${key}" data-prop="depth" aria-label="ゆらぎの深さ Depth"><output>${lfo.depth}${pitch ? "¢" : ""}</output></div></article>`;
           }).join("")}
         </div>
       </section>
       <section class="panel card keyboard-panel" aria-labelledby="keyboard-title">
         <div class="panel-heading"><div><p class="eyebrow">PLAY A NOTE</p><h2 id="keyboard-title">鍵盤をひいてみよう</h2></div><span class="step-badge badge-yellow">🎹 1オクターブ</span></div>
-        <p class="panel-copy">鍵盤を押している間、音が鳴るよ。パソコンの A〜K キーでも弾けます。</p>
+        <p class="panel-copy">鍵盤を押している間、音が鳴るよ。下のPCキーでもひけます。</p>
         <div class="keyboard" role="group" aria-label="1オクターブのピアノ鍵盤">
           ${Array.from({ length: 13 }, (_, i) => `<button type="button" class="key ${[1, 3, 6, 8, 10].includes(i) ? "black-key" : "white-key"}" data-note="${60 + i}" aria-label="${["ド", "ドのシャープ", "レ", "レのシャープ", "ミ", "ファ", "ファのシャープ", "ソ", "ソのシャープ", "ラ", "ラのシャープ", "シ", "高いド"][i]}"><span>${i === 0 ? "C" : i === 2 ? "D" : i === 4 ? "E" : i === 5 ? "F" : i === 7 ? "G" : i === 9 ? "A" : i === 11 ? "B" : ""}</span></button>`).join("")}
         </div>
+        <div class="key-shortcuts" aria-label="パソコンの音階キー"><span>PC</span>${["A", "W", "S", "E", "D", "F", "T", "G", "Y", "H", "U", "J", "K"].map((key) => `<kbd>${key}</kbd>`).join("")}</div>
         <p class="key-hint" id="key-hint" aria-live="polite">音の準備をしたら、鍵盤を押してね</p>
       </section>
       <section class="panel card midi-panel" aria-labelledby="midi-title">
@@ -154,7 +165,8 @@ const audioToggle = document.querySelector<HTMLButtonElement>("#audio-toggle")!;
 const audioStatus = document.querySelector<HTMLParagraphElement>("#audio-status")!;
 const keyHint = document.querySelector<HTMLParagraphElement>("#key-hint")!;
 const activeNotes = new Map<number, number>();
-const physicalKeys = new Map<string, number>([["a", 60], ["w", 61], ["s", 62], ["e", 63], ["d", 64], ["f", 65], ["t", 66], ["g", 67], ["y", 68], ["h", 69], ["u", 70], ["j", 71], ["k", 72]]);
+const activePhysicalKeys = new Map<string, number>();
+const activePointerNotes = new Map<number, Set<number>>();
 
 function routingLabel(id: string): string {
   if (id === "input") return "🎹 音の入口 (Input)";
@@ -174,7 +186,7 @@ function effectCard(id: EffectId): string {
     delay: [["time", "やまびこの間隔", "Delay Time", 0.01, 2, 0.01, "秒"], ["feedback", "やまびこの回数", "Feedback", 0, 0.8, 0.01, ""], ["wet", "音の混ざり", "Mix (Wet/Dry)", 0, 1, 0.01, "%"]],
     reverb: [["decay", "ひびきの長さ", "Decay Time", 0.1, 5, 0.1, "秒"], ["wet", "音の混ざり", "Mix (Wet/Dry)", 0, 1, 0.01, "%"]]
   };
-  return `<article class="effect-card"><div class="effect-heading"><label class="switch-label" for="effect-${id}"><input id="effect-${id}" type="checkbox" data-effect="${id}" data-prop="enabled" ${config.enabled ? "checked" : ""}><span class="switch"></span><span class="parameter-pair"><span>${effectNames[id]}</span><span class="parameter-term">${effectTerms[id]} · On / Bypass</span></span></label><span class="effect-symbol" aria-hidden="true">${["✦", "〰", "↘", "◒", "↗", "☁"][(["distortion", "chorus", "compressor", "eq", "delay", "reverb"] as EffectId[]).indexOf(id)]}</span></div><div class="effect-controls">${controls[id].map(([prop, label, term, min, max, step, unit]) => {
+  return `<article class="effect-card"><div class="effect-heading"><label class="switch-label" for="effect-${id}"><input id="effect-${id}" type="checkbox" data-effect="${id}" data-prop="enabled" ${config.enabled ? "checked" : ""}><span class="switch"></span><span class="parameter-pair"><span>${effectNames[id]}</span><span class="parameter-term">${effectTerms[id]} · On / Bypass</span></span></label><span class="effect-symbol" aria-hidden="true">${["✦", "〰", "↘", "◒", "↗", "☁"][(["distortion", "chorus", "compressor", "eq", "delay", "reverb"] as EffectId[]).indexOf(id)]}</span></div><div class="effect-visual"><span>音の変化</span><span class="effect-visual-flow">入力 → 出力</span><div id="effect-visual-${id}">${effectPreviewSvg(id, effectSettings)}</div></div><div class="effect-controls">${controls[id].map(([prop, label, term, min, max, step, unit]) => {
     const value = effectValue(id, prop);
     const shown = unit === "%" ? `${Math.round(value * (prop === "wet" ? 100 : 1))}%` : `${value}${unit ? ` ${unit}` : ""}`;
     return `<label class="effect-control" for="${id}-${prop}"><span class="parameter-pair"><span>${label}</span><span class="parameter-term">${term}</span></span><input id="${id}-${prop}" type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-effect="${id}" data-prop="${prop}" aria-label="${label} ${term}"><output>${shown}</output></label>`;
@@ -240,6 +252,11 @@ function updateEffectSetting(id: EffectId, prop: string, value: boolean | number
   }
 }
 
+function updateEffectPreview(id: EffectId): void {
+  const preview = document.querySelector<HTMLDivElement>(`#effect-visual-${id}`);
+  if (preview) preview.innerHTML = effectPreviewSvg(id, effectSettings);
+}
+
 document.querySelectorAll<HTMLInputElement>("[data-effect]").forEach((control) => {
   const update = (rebuild: boolean) => {
     const id = control.dataset.effect;
@@ -247,6 +264,7 @@ document.querySelectorAll<HTMLInputElement>("[data-effect]").forEach((control) =
     if (!id || !isEffectId(id) || !prop) return;
     const value = control.type === "checkbox" ? control.checked : Number(control.value);
     updateEffectSetting(id, prop, value);
+    updateEffectPreview(id);
     if (control.type !== "checkbox") {
       const output = control.parentElement?.querySelector("output");
       if (output && typeof value === "number") {
@@ -333,6 +351,14 @@ function stopNote(note: number): void {
   document.querySelector<HTMLButtonElement>(`.key[data-note="${note}"]`)?.classList.remove("pressed");
 }
 
+function releaseKeyboardNotes(): void {
+  const heldNotes = new Set(activePhysicalKeys.values());
+  activePhysicalKeys.clear();
+  for (const note of heldNotes) {
+    if (!activePointerNotes.has(note)) stopNote(note);
+  }
+}
+
 function stopMidiTransport(clearEffects = true): void {
   midiPlayer.stop();
   for (const note of activeNotes.keys()) stopNote(note);
@@ -361,7 +387,7 @@ audioToggle.addEventListener("click", async () => {
       audioToggle.querySelector(".button-icon")!.textContent = "■";
       audioToggle.querySelector("span:last-child")!.textContent = "音をとめる";
       audioStatus.textContent = graphReady ? "準備OK！鍵盤を押して音を鳴らそう" : document.querySelector<HTMLParagraphElement>("#route-message")!.textContent;
-      keyHint.textContent = "鍵盤を押すか、A〜K キーで弾いてみよう";
+      keyHint.textContent = "鍵盤を押すか、下のPCキーで弾いてみよう";
     }
   } catch (error) {
     audioStatus.textContent = "音声を開始できませんでした。ブラウザーの設定をご確認ください。";
@@ -420,25 +446,36 @@ function syncSettingsToUI(): void {
       prop === "volume" ? oscillator.volume :
       prop === "semitones" ? oscillator.semitones : oscillator.cents;
     control.value = String(value);
+    if (prop === "waveform") {
+      const path = document.querySelector<SVGPathElement>(`#wave-visual-${control.dataset.osc}`);
+      if (path) path.setAttribute("d", waveformPath(oscillator.waveform));
+    }
     if (prop === "volume" || prop === "cents") {
       const output = control.parentElement?.querySelector("output");
       if (output) output.value = prop === "volume" ? `${Math.round(Number(value) * 100)}%` : String(value);
     }
   });
   document.querySelectorAll<HTMLInputElement>("[data-envelope]").forEach((input) => {
-    const prop = input.dataset.envelope as keyof SynthSettings["envelope"];
-    const value = settings.envelope[prop];
-    input.value = String(prop === "sustain" ? Math.round(value * 100) : value);
+    const prop = input.dataset.envelope as EnvelopeControl;
+    settings.envelope[prop] = normalizeEnvelopeControl(
+      prop,
+      prop === "sustain" ? settings.envelope[prop] * 100 : settings.envelope[prop]
+    );
+    input.value = formatEnvelopeControl(prop, settings.envelope[prop]);
   });
   document.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-lfo]").forEach((control) => {
     const key = control.dataset.lfo as "pitchLfo" | "volumeLfo";
     const prop = control.dataset.prop as "enabled" | "waveform" | "frequency" | "depth";
     const lfo = settings[key];
     if (prop === "enabled" && control instanceof HTMLInputElement) control.checked = lfo.enabled;
-    else control.value = String(prop === "waveform" ? lfo.waveform : prop === "frequency" ? lfo.frequency : lfo.depth);
+    else control.value = String(prop === "waveform" ? lfo.waveform : prop === "frequency" ? lfoFrequencyToSlider(lfo.frequency) : lfo.depth);
     if (prop === "frequency" || prop === "depth") {
       const output = control.parentElement?.querySelector("output");
-      if (output) output.value = prop === "frequency" ? `${lfo.frequency} Hz${lfo.frequency > 20 ? " · 音声レート" : ""}` : `${lfo.depth}${key === "pitchLfo" ? "¢" : ""}`;
+      if (output) output.value = prop === "frequency" ? `${lfo.frequency.toFixed(lfo.frequency < 10 ? 1 : 0)} Hz${lfo.frequency > 20 ? " · 音声レート" : ""}` : `${lfo.depth}${key === "pitchLfo" ? "¢" : ""}`;
+    }
+    if (prop === "waveform") {
+      const path = document.querySelector<SVGPathElement>(`#${key}-wave-visual`);
+      if (path) path.setAttribute("d", waveformPath(lfo.waveform));
     }
   });
   document.querySelectorAll<HTMLInputElement>("[data-effect]").forEach((control) => {
@@ -452,6 +489,7 @@ function syncSettingsToUI(): void {
       const output = control.parentElement?.querySelector("output");
       if (output) output.value = effectOutput(prop, value);
     }
+    updateEffectPreview(id);
   });
   drawEnvelope();
   drawRouting();
@@ -488,8 +526,8 @@ document.querySelector<HTMLButtonElement>("#settings-import")!.addEventListener(
     Object.assign(effectSettings, imported.effects);
     routing = imported.routing;
     loadedMidi = imported.midi;
-    engine.setSettings(settings);
     syncSettingsToUI();
+    engine.setSettings(settings);
     const midiStatus = document.querySelector<HTMLParagraphElement>("#midi-status")!;
     const playButton = document.querySelector<HTMLButtonElement>("#midi-play")!;
     const stopButton = document.querySelector<HTMLButtonElement>("#midi-stop")!;
@@ -577,29 +615,43 @@ document.querySelectorAll<HTMLButtonElement>(".key").forEach((key) => {
   key.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     key.setPointerCapture(event.pointerId);
+    const pointers = activePointerNotes.get(note) ?? new Set<number>();
+    pointers.add(event.pointerId);
+    activePointerNotes.set(note, pointers);
     startNote(note);
   });
-  key.addEventListener("pointerup", () => stopNote(note));
-  key.addEventListener("pointercancel", () => stopNote(note));
-  key.addEventListener("lostpointercapture", () => stopNote(note));
+  const releasePointerNote = (event: PointerEvent) => {
+    const pointers = activePointerNotes.get(note);
+    pointers?.delete(event.pointerId);
+    if (pointers?.size === 0) activePointerNotes.delete(note);
+    if (!activePointerNotes.has(note) && ![...activePhysicalKeys.values()].includes(note)) stopNote(note);
+  };
+  key.addEventListener("pointerup", releasePointerNote);
+  key.addEventListener("pointercancel", releasePointerNote);
+  key.addEventListener("lostpointercapture", releasePointerNote);
 });
 
 window.addEventListener("keydown", (event) => {
-  if (event.repeat || event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement ||
-      event.target instanceof HTMLTextAreaElement ||
-      (event.target instanceof HTMLElement && event.target.isContentEditable)) return;
-  const note = physicalKeys.get(event.key.toLowerCase());
-  if (note !== undefined) {
-    event.preventDefault();
-    startNote(note);
-  }
+  const target = event.target instanceof HTMLElement
+    ? { tagName: event.target.tagName, isContentEditable: event.target.isContentEditable }
+    : null;
+  const note = pianoNoteForKey(event.code, event.repeat, target, event.altKey || event.ctrlKey || event.metaKey);
+  if (note === null) return;
+  event.preventDefault();
+  if (activePhysicalKeys.has(event.code)) return;
+  activePhysicalKeys.set(event.code, note);
+  startNote(note);
 });
 window.addEventListener("keyup", (event) => {
-  const note = physicalKeys.get(event.key.toLowerCase());
-  if (note !== undefined) stopNote(note);
+  const note = activePhysicalKeys.get(event.code);
+  if (note === undefined) return;
+  event.preventDefault();
+  activePhysicalKeys.delete(event.code);
+  if (![...activePhysicalKeys.values()].includes(note) && !activePointerNotes.has(note)) stopNote(note);
 });
-window.addEventListener("blur", () => {
-  for (const note of activeNotes.keys()) stopNote(note);
+window.addEventListener("blur", releaseKeyboardNotes);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) releaseKeyboardNotes();
 });
 
 document.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-osc]").forEach((control) => {
@@ -617,6 +669,10 @@ document.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-osc]").fo
       prop === "volume" ? settings.oscillators[index].volume :
       prop === "semitones" ? settings.oscillators[index].semitones : settings.oscillators[index].cents;
     control.value = String(normalized);
+    if (prop === "waveform") {
+      const path = document.querySelector<SVGPathElement>(`#wave-visual-${index}`);
+      if (path) path.setAttribute("d", waveformPath(settings.oscillators[index].waveform));
+    }
     if (prop === "volume" || prop === "cents") {
       const output = control.parentElement?.querySelector("output");
       if (output) output.value = prop === "volume" ? `${Math.round(Number(value) * 100)}%` : String(value);
@@ -637,15 +693,18 @@ document.querySelectorAll<HTMLButtonElement>(".step-button").forEach((button) =>
 });
 
 document.querySelectorAll<HTMLInputElement>("[data-envelope]").forEach((input) => {
-  input.addEventListener("input", () => {
-    const prop = input.dataset.envelope as keyof SynthSettings["envelope"];
-    const max = prop === "sustain" ? 1 : 5;
+  const update = (format: boolean) => {
+    const prop = input.dataset.envelope as EnvelopeControl;
+    if (input.value.trim() === "") return;
     const raw = Number(input.value);
-    settings.envelope[prop] = clamp(prop === "sustain" ? raw / 100 : raw, prop === "sustain" ? 0 : 0.01, max);
-    input.value = String(prop === "sustain" ? Math.round(settings.envelope[prop] * 100) : settings.envelope[prop]);
+    if (!Number.isFinite(raw)) return;
+    settings.envelope[prop] = normalizeEnvelopeControl(prop, raw);
+    if (format) input.value = formatEnvelopeControl(prop, settings.envelope[prop]);
     drawEnvelope();
     applySettings();
-  });
+  };
+  input.addEventListener("input", () => update(false));
+  input.addEventListener("change", () => update(true));
 });
 
 document.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-lfo]").forEach((control) => {
@@ -655,11 +714,15 @@ document.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-lfo]").fo
     const lfo = settings[key];
     if (prop === "enabled" && control instanceof HTMLInputElement) lfo.enabled = control.checked;
     if (prop === "waveform") lfo.waveform = control.value as typeof lfo.waveform;
-    if (prop === "frequency") lfo.frequency = clamp(Number(control.value), 0.1, 2000);
+    if (prop === "frequency" && control instanceof HTMLInputElement) lfo.frequency = lfoSliderToFrequency(Number(control.value));
     if (prop === "depth") lfo.depth = clamp(Number(control.value), 0, key === "pitchLfo" ? 200 : 0.5);
     const output = control.parentElement?.querySelector("output");
     if (output && prop !== "enabled" && prop !== "waveform") {
-      output.value = prop === "frequency" ? `${lfo.frequency} Hz${lfo.frequency > 20 ? " · 音声レート" : ""}` : `${lfo.depth}${key === "pitchLfo" ? "¢" : ""}`;
+      output.value = prop === "frequency" ? `${lfo.frequency.toFixed(lfo.frequency < 10 ? 1 : 0)} Hz${lfo.frequency > 20 ? " · 音声レート" : ""}` : `${lfo.depth}${key === "pitchLfo" ? "¢" : ""}`;
+    }
+    if (prop === "waveform") {
+      const path = document.querySelector<SVGPathElement>(`#${key}-wave-visual`);
+      if (path) path.setAttribute("d", waveformPath(lfo.waveform));
     }
     applySettings();
   };
@@ -689,7 +752,7 @@ function drawEnvelope(): void {
   envelopeHandles.release.setAttribute("cx", String(xEnd));
   envelopeHandles.release.setAttribute("cy", "96");
   envelopeHandles.attack.setAttribute("aria-valuenow", attack.toFixed(2));
-  envelopeHandles.sustain.setAttribute("aria-valuenow", String(Math.round(sustain * 100)));
+  envelopeHandles.sustain.setAttribute("aria-valuenow", (sustain * 100).toFixed(2));
   envelopeHandles.release.setAttribute("aria-valuenow", release.toFixed(2));
 }
 drawEnvelope();
@@ -714,7 +777,7 @@ function updateEnvelopeFromPointer(event: PointerEvent): void {
   }
   for (const [key, value] of Object.entries(settings.envelope)) {
     const input = document.querySelector<HTMLInputElement>(`[data-envelope="${key}"]`);
-    if (input) input.value = String(key === "sustain" ? Math.round(value * 100) : value);
+    if (input) input.value = formatEnvelopeControl(key as EnvelopeControl, value);
   }
   drawEnvelope();
   applySettings();
@@ -737,10 +800,7 @@ Object.entries(envelopeHandles).forEach(([name, handle]) => {
     if (part === "release") settings.envelope.release = clamp(settings.envelope.release + delta, 0.01, 5);
     if (part === "sustain") settings.envelope.sustain = clamp(settings.envelope.sustain - delta, 0, 1);
     const input = document.querySelector<HTMLInputElement>(`[data-envelope="${part}"]`);
-    if (input) {
-      const current = settings.envelope[part];
-      input.value = String(part === "sustain" ? Math.round(current * 100) : current);
-    }
+    if (input) input.value = formatEnvelopeControl(part, settings.envelope[part]);
     drawEnvelope();
     applySettings();
   });
