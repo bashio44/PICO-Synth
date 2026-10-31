@@ -95,6 +95,9 @@ export class EffectsGraphBuilder {
       const compressor = context.createDynamicsCompressor();
       compressor.threshold.value = params.threshold;
       compressor.ratio.value = params.ratio;
+      compressor.knee.value = params.knee;
+      compressor.attack.value = params.attack;
+      compressor.release.value = params.release;
       input.connect(compressor);
       compressor.connect(output);
       nodes.push(compressor);
@@ -111,6 +114,7 @@ export class EffectsGraphBuilder {
     nodes.push(dry, wet);
 
     let processor: AudioNode;
+    let outputProcessor: AudioNode;
     switch (id) {
       case "distortion": {
         const params = config as EffectSettingsById["distortion"];
@@ -118,13 +122,18 @@ export class EffectsGraphBuilder {
         shaper.curve = this.distortionCurve(params.drive);
         shaper.oversample = "2x";
         processor = shaper;
-        nodes.push(shaper);
+        const tone = context.createBiquadFilter();
+        tone.type = "lowpass";
+        tone.frequency.value = Math.min(params.tone, context.sampleRate / 2);
+        shaper.connect(tone);
+        nodes.push(shaper, tone);
+        outputProcessor = tone;
         break;
       }
       case "chorus": {
         const params = config as EffectSettingsById["chorus"];
         const delay = context.createDelay(0.1);
-        delay.delayTime.value = 0.018;
+        delay.delayTime.value = 0.05;
         const lfo = context.createOscillator();
         const depth = context.createGain();
         lfo.type = "sine";
@@ -135,6 +144,7 @@ export class EffectsGraphBuilder {
         lfo.start();
         sources.push(lfo);
         processor = delay;
+        outputProcessor = processor;
         nodes.push(delay, depth);
         break;
       }
@@ -146,6 +156,7 @@ export class EffectsGraphBuilder {
         filter.Q.value = params.q;
         filter.gain.value = params.gain;
         processor = filter;
+        outputProcessor = processor;
         nodes.push(filter);
         break;
       }
@@ -155,10 +166,10 @@ export class EffectsGraphBuilder {
         const feedback = context.createGain();
         delay.delayTime.value = params.time;
         feedback.gain.value = Math.min(0.8, params.feedback);
-        input.connect(delay);
         delay.connect(feedback);
         feedback.connect(delay);
         processor = delay;
+        outputProcessor = processor;
         nodes.push(delay, feedback);
         break;
       }
@@ -166,15 +177,19 @@ export class EffectsGraphBuilder {
         const params = config as EffectSettingsById["reverb"];
         const convolver = context.createConvolver();
         convolver.buffer = this.createImpulse(context, params.decay);
-        processor = convolver;
-        nodes.push(convolver);
+        const preDelay = context.createDelay(0.2);
+        preDelay.delayTime.value = params.preDelay;
+        processor = preDelay;
+        outputProcessor = convolver;
+        preDelay.connect(convolver);
+        nodes.push(preDelay, convolver);
         break;
       }
       default:
         throw new Error(`エフェクト「${id}」はまだ利用できません。`);
     }
     input.connect(processor);
-    processor.connect(wet);
+    outputProcessor.connect(wet);
     wet.connect(output);
     return { input, output, nodes, sources };
   }

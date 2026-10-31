@@ -4,6 +4,7 @@ import { defaultEffects, type EffectId } from "../model/effects";
 
 class FakeAudioParam {
   value = 0;
+  events: Array<{ method: string; value: number; time?: number }> = [];
   setValueAtTime(value: number): void { this.value = value; }
 }
 
@@ -37,6 +38,9 @@ class FakeFilter extends FakeNode {
 class FakeCompressor extends FakeNode {
   threshold = new FakeAudioParam();
   ratio = new FakeAudioParam();
+  knee = new FakeAudioParam();
+  attack = new FakeAudioParam();
+  release = new FakeAudioParam();
 }
 
 class FakeShaper extends FakeNode {
@@ -128,11 +132,13 @@ describe("effect audio parameter wiring", () => {
     const { context: highDrive } = buildEffect("distortion", (effects) => {
       effects.distortion.drive = 90;
       effects.distortion.wet = 0.8;
+      effects.distortion.tone = 3_500;
     });
 
     expect(lowDrive.shapers[0].curve).not.toEqual(highDrive.shapers[0].curve);
     expect(highDrive.gains.map((node) => node.gain.value)).toContain(0.8);
     expect(highDrive.gains.map((node) => node.gain.value).some((value) => Math.abs(value - 0.2) < 0.001)).toBe(true);
+    expect(highDrive.filters.some((filter) => filter.type === "lowpass" && filter.frequency.value === 3_500)).toBe(true);
   });
 
   it("applies chorus rate, depth, and wet mix", () => {
@@ -147,13 +153,19 @@ describe("effect audio parameter wiring", () => {
     expect(context.gains.map((node) => node.gain.value).some((value) => Math.abs(value - 0.3) < 0.001)).toBe(true);
   });
 
-  it("applies compressor threshold and ratio", () => {
+  it("applies compressor threshold, ratio, knee, attack, and release", () => {
     const { context } = buildEffect("compressor", (effects) => {
       effects.compressor.threshold = -36;
       effects.compressor.ratio = 8;
+      effects.compressor.knee = 12;
+      effects.compressor.attack = 0.02;
+      effects.compressor.release = 0.4;
     });
     expect(context.compressors[0].threshold.value).toBe(-36);
     expect(context.compressors[0].ratio.value).toBe(8);
+    expect(context.compressors[0].knee.value).toBe(12);
+    expect(context.compressors[0].attack.value).toBe(0.02);
+    expect(context.compressors[0].release.value).toBe(0.4);
   });
 
   it("applies EQ frequency, Q, gain, and wet mix", () => {
@@ -185,9 +197,11 @@ describe("effect audio parameter wiring", () => {
   it("applies reverb decay and wet mix", () => {
     const { context } = buildEffect("reverb", (effects) => {
       effects.reverb.decay = 2.5;
+      effects.reverb.preDelay = 0.035;
       effects.reverb.wet = 0.35;
     });
     expect(context.buffers[0].length).toBe(120_000);
+    expect(context.delays[0].delayTime.value).toBe(0.035);
     expect(context.convolvers[0].buffer).not.toBeNull();
     expect(context.gains.map((node) => node.gain.value)).toContain(0.35);
     expect(context.gains.map((node) => node.gain.value)).toContain(0.65);

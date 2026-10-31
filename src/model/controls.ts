@@ -12,7 +12,7 @@ export function formatEnvelopeControl(control: EnvelopeControl, value: number): 
   return (control === "sustain" ? value * 100 : value).toFixed(2);
 }
 
-const LFO_MIN_FREQUENCY = 0.1;
+const LFO_MIN_FREQUENCY = 0.01;
 const LFO_MAX_FREQUENCY = 2_000;
 const LFO_SLIDER_STEPS = 10_000;
 const LFO_FREQUENCY_RATIO = LFO_MAX_FREQUENCY / LFO_MIN_FREQUENCY;
@@ -25,4 +25,8 @@ export function lfoFrequencyToSlider(frequency: number): number {
 export function lfoSliderToFrequency(value: number): number {
   const position = clamp(value, 0, LFO_SLIDER_STEPS) / LFO_SLIDER_STEPS;
   return LFO_MIN_FREQUENCY * LFO_FREQUENCY_RATIO ** position;
+}
+
+export function formatLfoFrequency(frequency: number): string {
+  return String(Number(frequency.toFixed(4)));
 }

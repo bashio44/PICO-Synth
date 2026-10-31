@@ -3,6 +3,7 @@ import {
   formatEnvelopeControl,
   lfoFrequencyToSlider,
   lfoSliderToFrequency,
+  formatLfoFrequency,
   normalizeEnvelopeControl
 } from "./controls";
 
@@ -28,14 +29,19 @@ describe("ADSR control precision", () => {
 });
 
 describe("LFO frequency slider mapping", () => {
-  it.each([0.1, 0.5, 1, 5, 20, 440, 2_000])("round-trips %s Hz", (frequency) => {
+  it.each([0.01, 0.1, 0.5, 1, 5, 20, 440, 2_000])("round-trips %s Hz", (frequency) => {
     expect(lfoSliderToFrequency(lfoFrequencyToSlider(frequency))).toBeCloseTo(frequency, 0);
   });
 
   it("uses the full slider range for the supported frequency range", () => {
-    expect(lfoFrequencyToSlider(0.1)).toBe(0);
+    expect(lfoFrequencyToSlider(0.01)).toBe(0);
     expect(lfoFrequencyToSlider(2_000)).toBe(10_000);
     expect(lfoFrequencyToSlider(5)).toBeGreaterThan(3_000);
-    expect(lfoFrequencyToSlider(5)).toBeLessThan(5_000);
+    expect(lfoFrequencyToSlider(5)).toBeLessThan(6_000);
+  });
+
+  it("preserves intermediate frequencies for direct numeric entry", () => {
+    expect(formatLfoFrequency(0.0137)).toBe("0.0137");
+    expect(formatLfoFrequency(5.2374)).toBe("5.2374");
   });
 });

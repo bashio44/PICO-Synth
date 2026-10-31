@@ -6,12 +6,12 @@ export interface WetSettings {
 }
 
 export interface EffectSettingsById {
-  distortion: WetSettings & { drive: number };
+  distortion: WetSettings & { drive: number; tone: number };
   chorus: WetSettings & { rate: number; depth: number };
-  compressor: { enabled: boolean; threshold: number; ratio: number };
+  compressor: { enabled: boolean; threshold: number; ratio: number; knee: number; attack: number; release: number };
   eq: WetSettings & { frequency: number; q: number; gain: number };
   delay: WetSettings & { time: number; feedback: number };
-  reverb: WetSettings & { decay: number };
+  reverb: WetSettings & { decay: number; preDelay: number };
 }
 
 export type EffectConfiguration = {
@@ -42,12 +42,12 @@ export const effectTerms: Record<EffectId, string> = {
 };
 
 export const defaultEffects: EffectConfiguration = {
-  distortion: { enabled: false, wet: 0.35, drive: 28 },
+  distortion: { enabled: false, wet: 0.35, drive: 28, tone: 12_000 },
   chorus: { enabled: false, wet: 0.3, rate: 0.8, depth: 0.012 },
-  compressor: { enabled: false, threshold: -24, ratio: 4 },
+  compressor: { enabled: false, threshold: -24, ratio: 4, knee: 30, attack: 0.003, release: 0.25 },
   eq: { enabled: false, wet: 1, frequency: 1200, q: 0.8, gain: 0 },
   delay: { enabled: false, wet: 0.25, time: 0.28, feedback: 0.32 },
-  reverb: { enabled: false, wet: 0.2, decay: 1.8 }
+  reverb: { enabled: false, wet: 0.2, decay: 1.8, preDelay: 0.02 }
 };
 
 export const defaultRouting: RoutingEdge[] = [
@@ -66,12 +66,12 @@ export type RoutingNodeId = (typeof routingNodes)[number];
 export function validateEffects(effects: EffectConfiguration): string | null {
   if (!effects || typeof effects !== "object") return "エフェクト設定が見つかりません。";
   const rules: Record<EffectId, Array<[string, number, number]>> = {
-    distortion: [["wet", 0, 1], ["drive", 0, 100]],
+    distortion: [["wet", 0, 1], ["drive", 0, 100], ["tone", 200, 20_000]],
     chorus: [["wet", 0, 1], ["rate", 0.1, 10], ["depth", 0.001, 0.05]],
-    compressor: [["threshold", -100, 0], ["ratio", 1, 20]],
+    compressor: [["threshold", -100, 0], ["ratio", 1, 20], ["knee", 0, 40], ["attack", 0.001, 1], ["release", 0.01, 1]],
     eq: [["wet", 0, 1], ["frequency", 20, 20_000], ["q", 0.1, 18], ["gain", -24, 24]],
     delay: [["wet", 0, 1], ["time", 0.01, 2], ["feedback", 0, 0.8]],
-    reverb: [["wet", 0, 1], ["decay", 0.1, 5]]
+    reverb: [["wet", 0, 1], ["decay", 0.1, 5], ["preDelay", 0, 0.2]]
   };
   for (const [id, fields] of Object.entries(rules) as [EffectId, Array<[string, number, number]>][]) {
     const config = effects[id] as Record<string, unknown> | undefined;

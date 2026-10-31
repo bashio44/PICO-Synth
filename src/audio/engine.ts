@@ -7,20 +7,27 @@ interface Voice {
   sources: AudioScheduledSourceNode[];
   nodes: AudioNode[];
   oscillatorParts: OscillatorPart[];
-  envelope: GainNode;
+  envelopes: [EnvelopeState, EnvelopeState];
   volumeVca: GainNode;
+  fmDepth: GainNode;
+  fmSource: AudioNode | null;
+  fmTarget: AudioParam | null;
   pitchLfo: LfoNodes | null;
   volumeLfo: LfoNodes;
+  released: boolean;
+  activeSources: number;
+}
+
+interface EnvelopeState {
+  node: GainNode;
   peak: number;
   sustain: number;
   attack: number;
   decay: number;
   release: number;
-  released: boolean;
   releaseStartedAt: number | null;
   releaseStartLevel: number;
   releaseEndAt: number | null;
-  activeSources: number;
 }
 
 interface OscillatorPart {
@@ -79,7 +86,8 @@ export class AudioEngine {
     for (const voice of this.voices.values()) {
       for (const part of voice.oscillatorParts) {
         const oscillator = this.settings.oscillators[part.index];
-        part.gain.gain.setTargetAtTime(oscillator.volume, now, 0.015);
+        const volume = part.index === 1 && this.settings.fmEnabled ? 0 : oscillator.volume;
+        part.gain.gain.setTargetAtTime(volume, now, 0.015);
         if (oscillator.waveform === "noise" && part.oscillator) {
           this.replaceOscillatorWithNoise(voice, part, oscillator.semitones, oscillator.cents, now);
         } else if (oscillator.waveform !== "noise" && !part.oscillator) {
@@ -92,6 +100,7 @@ export class AudioEngine {
           part.filter.frequency.setTargetAtTime(this.noiseCutoff(part.baseFrequency, oscillator.semitones, oscillator.cents), now, 0.015);
         }
       }
+      this.updateFmRoute(voice, now);
       if (voice.pitchLfo) {
         voice.pitchLfo.source.type = this.settings.pitchLfo.waveform;
         voice.pitchLfo.source.frequency.setTargetAtTime(this.settings.pitchLfo.frequency, now, 0.015);
@@ -101,7 +110,13 @@ export class AudioEngine {
       voice.volumeLfo.source.frequency.setTargetAtTime(this.settings.volumeLfo.frequency, now, 0.015);
       voice.volumeLfo.depth.gain.setTargetAtTime(this.settings.volumeLfo.enabled ? this.settings.volumeLfo.depth : 0, now, 0.015);
       voice.volumeVca.gain.setTargetAtTime(this.settings.volumeLfo.enabled ? 1 - this.settings.volumeLfo.depth : 1, now, 0.015);
-      this.updateVoiceEnvelope(voice, now);
+      this.updateVoiceEnvelope(voice, 0, this.settings.envelope, now);
+      this.updateVoiceEnvelope(
+        voice,
+        1,
+        this.settings.envelope2Enabled ? this.settings.envelope2 : this.settings.envelope,
+        now
+      );
     }
   }
 
@@ -114,31 +129,51 @@ export class AudioEngine {
     }
 
     const id = this.nextVoiceId++;
-    const envelope = this.context.createGain();
     const amp = clamp(velocity / 127, 0, 1);
-    const { attack, decay, sustain } = this.settings.envelope;
     const oscillatorVolume = this.settings.oscillators.reduce((total, oscillator) => total + oscillator.volume, 0);
     const mixHeadroom = Math.min(1, 0.75 / Math.max(0.75, oscillatorVolume));
     const polyphonyHeadroom = Math.sqrt(8 / this.settings.polyphony);
     const peak = amp * 0.18 * mixHeadroom * polyphonyHeadroom;
-    envelope.gain.setValueAtTime(0, now);
-    envelope.gain.linearRampToValueAtTime(peak, now + attack);
-    envelope.gain.linearRampToValueAtTime(peak * sustain, now + attack + decay);
-
-    const nodes: AudioNode[] = [envelope];
+    const nodes: AudioNode[] = [];
     const sources: AudioScheduledSourceNode[] = [];
     const oscillatorParts: OscillatorPart[] = [];
     const pitchTargets: AudioParam[] = [];
     const volumeVca = this.context.createGain();
     volumeVca.gain.value = this.settings.volumeLfo.enabled ? 1 - this.settings.volumeLfo.depth : 1;
-    envelope.connect(volumeVca);
     volumeVca.connect(this.master);
     nodes.push(volumeVca);
+    const envelopes = [0, 1].map((index) => {
+      const settings = index === 1 && this.settings.envelope2Enabled
+        ? this.settings.envelope2
+        : this.settings.envelope;
+      const node = this.context!.createGain();
+      node.gain.setValueAtTime(0, now);
+      node.gain.linearRampToValueAtTime(peak, now + settings.attack);
+      node.gain.linearRampToValueAtTime(peak * settings.sustain, now + settings.attack + settings.decay);
+      node.connect(volumeVca);
+      nodes.push(node);
+      return {
+        node,
+        peak,
+        sustain: settings.sustain,
+        attack: settings.attack,
+        decay: settings.decay,
+        release: settings.release,
+        releaseStartedAt: null,
+        releaseStartLevel: 0,
+        releaseEndAt: null
+      };
+    }) as [EnvelopeState, EnvelopeState];
+    const fmDepth = this.context.createGain();
+    fmDepth.gain.value = this.settings.fmEnabled
+      ? this.settings.fmDepth * this.settings.oscillators[1].volume
+      : 0;
+    nodes.push(fmDepth);
     const baseFrequency = midiFrequency(note);
     for (const [index, oscillator] of this.settings.oscillators.entries()) {
       const oscillatorGain = this.context.createGain();
-      oscillatorGain.gain.value = oscillator.volume;
-      oscillatorGain.connect(envelope);
+      oscillatorGain.gain.value = index === 1 && this.settings.fmEnabled ? 0 : oscillator.volume;
+      oscillatorGain.connect(envelopes[index as 0 | 1].node);
       nodes.push(oscillatorGain);
 
       const frequency = this.oscillatorFrequency(baseFrequency, oscillator.semitones);
@@ -168,11 +203,11 @@ export class AudioEngine {
 
     const lfos = this.addLfo(nodes, sources, pitchTargets, volumeVca, now);
     const voice: Voice = {
-      id, note, startedAt: now, sources, nodes, oscillatorParts, envelope, volumeVca,
-      pitchLfo: lfos.pitch, volumeLfo: lfos.volume, peak, sustain,
-      attack, decay, release: this.settings.envelope.release, released: false,
-      releaseStartedAt: null, releaseStartLevel: 0, releaseEndAt: null, activeSources: 0
+      id, note, startedAt: now, sources, nodes, oscillatorParts, envelopes, volumeVca,
+      fmDepth, fmSource: null, fmTarget: null,
+      pitchLfo: lfos.pitch, volumeLfo: lfos.volume, released: false, activeSources: 0
     };
+    this.updateFmRoute(voice, now);
     this.voices.set(id, voice);
     for (const source of sources) this.trackSource(voice, source);
     return id;
@@ -183,15 +218,17 @@ export class AudioEngine {
     if (!voice || voice.released || !this.context) return;
     voice.released = true;
     const now = Math.max(this.context.currentTime, at ?? this.context.currentTime);
-    const currentLevel = this.envelopeAt(voice, now);
-    const releaseEnd = now + Math.max(0.015, voice.release);
-    voice.releaseStartedAt = now;
-    voice.releaseStartLevel = currentLevel;
-    voice.releaseEndAt = releaseEnd;
-    const gain = voice.envelope.gain;
-    gain.cancelScheduledValues(now);
-    gain.setValueAtTime(currentLevel, now);
-    gain.linearRampToValueAtTime(0, releaseEnd);
+    const releaseEnd = now + Math.max(...voice.envelopes.map((envelope) => envelope.release), 0.015);
+    for (const envelope of voice.envelopes) {
+      const currentLevel = this.envelopeAt(voice, envelope, now);
+      envelope.releaseStartedAt = now;
+      envelope.releaseStartLevel = currentLevel;
+      envelope.releaseEndAt = now + Math.max(0.015, envelope.release);
+      const gain = envelope.node.gain;
+      gain.cancelScheduledValues(now);
+      gain.setValueAtTime(currentLevel, now);
+      gain.linearRampToValueAtTime(0, envelope.releaseEndAt);
+    }
     for (const source of voice.sources) {
       try {
         source.stop(releaseEnd + 0.03);
@@ -320,54 +357,88 @@ export class AudioEngine {
     }, { once: true });
   }
 
-  private envelopeAt(voice: Voice, at: number): number {
+  private envelopeAt(voice: Voice, envelope: EnvelopeState, at: number): number {
     const elapsed = Math.max(0, at - voice.startedAt);
-    if (voice.attack > 0 && elapsed < voice.attack) return voice.peak * elapsed / voice.attack;
-    const decayElapsed = elapsed - voice.attack;
-    const sustainLevel = voice.peak * voice.sustain;
-    if (voice.decay > 0 && decayElapsed < voice.decay) {
-      return voice.peak + (sustainLevel - voice.peak) * decayElapsed / voice.decay;
+    if (envelope.attack > 0 && elapsed < envelope.attack) return envelope.peak * elapsed / envelope.attack;
+    const decayElapsed = elapsed - envelope.attack;
+    const sustainLevel = envelope.peak * envelope.sustain;
+    if (envelope.decay > 0 && decayElapsed < envelope.decay) {
+      return envelope.peak + (sustainLevel - envelope.peak) * decayElapsed / envelope.decay;
     }
     return sustainLevel;
   }
 
-  private updateVoiceEnvelope(voice: Voice, now: number): void {
+  private updateVoiceEnvelope(
+    voice: Voice,
+    index: 0 | 1,
+    settings: SynthSettings["envelope"],
+    now: number
+  ): void {
     if (!this.context) return;
-    const gain = voice.envelope.gain;
-    const next = this.settings.envelope;
+    const envelope = voice.envelopes[index];
+    const gain = envelope.node.gain;
     if (voice.released) {
-      if (voice.releaseStartedAt === null || voice.releaseEndAt === null || now >= voice.releaseEndAt) return;
-      const progress = (now - voice.releaseStartedAt) / (voice.releaseEndAt - voice.releaseStartedAt);
-      const currentLevel = voice.releaseStartLevel * (1 - progress);
-      voice.release = next.release;
-      voice.releaseStartedAt = now;
-      voice.releaseStartLevel = currentLevel;
-      voice.releaseEndAt = now + Math.max(0.015, next.release);
+      if (envelope.releaseStartedAt === null || envelope.releaseEndAt === null || now >= envelope.releaseEndAt) return;
+      const progress = (now - envelope.releaseStartedAt) / (envelope.releaseEndAt - envelope.releaseStartedAt);
+      const currentLevel = envelope.releaseStartLevel * (1 - progress);
+      envelope.release = settings.release;
+      envelope.releaseStartedAt = now;
+      envelope.releaseStartLevel = currentLevel;
+      envelope.releaseEndAt = now + Math.max(0.015, settings.release);
       gain.cancelScheduledValues(now);
       gain.setValueAtTime(currentLevel, now);
-      gain.linearRampToValueAtTime(0, voice.releaseEndAt);
+      gain.linearRampToValueAtTime(0, envelope.releaseEndAt);
       return;
     }
 
-    const currentLevel = this.envelopeAt(voice, now);
-    voice.attack = next.attack;
-    voice.decay = next.decay;
-    voice.sustain = next.sustain;
-    voice.release = next.release;
+    const currentLevel = this.envelopeAt(voice, envelope, now);
+    envelope.attack = settings.attack;
+    envelope.decay = settings.decay;
+    envelope.sustain = settings.sustain;
+    envelope.release = settings.release;
     gain.cancelScheduledValues(now);
     gain.setValueAtTime(currentLevel, now);
     const elapsed = Math.max(0, now - voice.startedAt);
-    const attackEnd = voice.startedAt + voice.attack;
-    const decayEnd = attackEnd + voice.decay;
-    const sustainLevel = voice.peak * voice.sustain;
-    if (elapsed < voice.attack) {
-      gain.linearRampToValueAtTime(voice.peak, attackEnd);
+    const attackEnd = voice.startedAt + envelope.attack;
+    const decayEnd = attackEnd + envelope.decay;
+    const sustainLevel = envelope.peak * envelope.sustain;
+    if (elapsed < envelope.attack) {
+      gain.linearRampToValueAtTime(envelope.peak, attackEnd);
       gain.linearRampToValueAtTime(sustainLevel, decayEnd);
-    } else if (elapsed < voice.attack + voice.decay) {
+    } else if (elapsed < envelope.attack + envelope.decay) {
       gain.linearRampToValueAtTime(sustainLevel, decayEnd);
     } else {
       gain.setTargetAtTime(sustainLevel, now, 0.015);
     }
+  }
+
+  private updateFmRoute(voice: Voice, now: number): void {
+    const modulator = voice.oscillatorParts[1];
+    const carrier = voice.oscillatorParts[0];
+    if (!modulator || !carrier) return;
+    const target = carrier.oscillator?.frequency ?? carrier.filter?.frequency ?? null;
+    const source = modulator.source;
+    if (voice.fmSource !== source) {
+      voice.fmSource?.disconnect(voice.fmDepth);
+      voice.fmSource = null;
+      if (this.settings.fmEnabled) {
+        source.connect(voice.fmDepth);
+        voice.fmSource = source;
+      }
+    }
+    if (voice.fmTarget !== target) {
+      if (voice.fmTarget) voice.fmDepth.disconnect();
+      voice.fmTarget = null;
+      if (target && this.settings.fmEnabled) {
+        voice.fmDepth.connect(target);
+        voice.fmTarget = target;
+      }
+    }
+    voice.fmDepth.gain.setTargetAtTime(
+      this.settings.fmEnabled ? this.settings.fmDepth * this.settings.oscillators[1].volume : 0,
+      now,
+      0.015
+    );
   }
 
   private createNoiseSource(): AudioBufferSourceNode {

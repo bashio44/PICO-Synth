@@ -22,4 +22,13 @@ describe("audio routing validation", () => {
     effects.delay.feedback = 0.9;
     expect(validateEffects(effects)).toMatch(/feedback/);
   });
+
+  it("enforces stable ranges for the added effect controls", () => {
+    const effects = structuredClone(defaultEffects);
+    effects.compressor.attack = 0;
+    expect(validateEffects(effects)).toMatch(/attack/);
+    effects.compressor.attack = defaultEffects.compressor.attack;
+    effects.reverb.preDelay = 0.21;
+    expect(validateEffects(effects)).toMatch(/preDelay/);
+  });
 });

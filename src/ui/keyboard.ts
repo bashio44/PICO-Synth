@@ -1,5 +1,6 @@
 export interface PianoKeyboardTarget {
   tagName?: string;
+  inputType?: string;
   isContentEditable?: boolean;
 }
 
@@ -27,6 +28,7 @@ export function pianoNoteForKey(
 ): number | null {
   if (repeat || hasModifier || target?.isContentEditable) return null;
   const tagName = target?.tagName?.toUpperCase();
-  if (tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT") return null;
+  if (tagName === "TEXTAREA") return null;
+  if (tagName === "INPUT" && !["range", "number", "checkbox", "radio"].includes(target?.inputType ?? "")) return null;
   return pianoKeyNotes[code] ?? null;
 }

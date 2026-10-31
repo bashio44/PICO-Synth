@@ -51,9 +51,24 @@ export function parseAppSettings(text: string): AppSettings {
     sustain: readNumber(sourceEnvelope.sustain, "ADSR sustain", 0, 1),
     release: readNumber(sourceEnvelope.release, "ADSR release", 0.01, 5)
   };
+  const sourceEnvelope2 = sourceSynth.envelope2 === undefined
+    ? envelope
+    : asRecord(sourceSynth.envelope2, "OSC 2 ADSR");
+  const envelope2 = sourceSynth.envelope2 === undefined ? { ...envelope } : {
+    attack: readNumber(sourceEnvelope2.attack, "OSC 2 ADSR attack", 0.01, 5),
+    decay: readNumber(sourceEnvelope2.decay, "OSC 2 ADSR decay", 0.01, 5),
+    sustain: readNumber(sourceEnvelope2.sustain, "OSC 2 ADSR sustain", 0, 1),
+    release: readNumber(sourceEnvelope2.release, "OSC 2 ADSR release", 0.01, 5)
+  };
   const synth: SynthSettings = {
     oscillators,
     envelope,
+    envelope2,
+    envelope2Enabled: sourceSynth.envelope2Enabled === undefined
+      ? false
+      : readBoolean(sourceSynth.envelope2Enabled, "OSC 2 ADSR 個別設定"),
+    fmEnabled: sourceSynth.fmEnabled === undefined ? false : readBoolean(sourceSynth.fmEnabled, "FM変調"),
+    fmDepth: sourceSynth.fmDepth === undefined ? 100 : readNumber(sourceSynth.fmDepth, "FM変調の深さ", 0, 1000),
     pitchLfo: parseLfo(sourceSynth.pitchLfo, "ピッチLFO", true),
     volumeLfo: parseLfo(sourceSynth.volumeLfo, "音量LFO", false),
     polyphony: readInteger(sourceSynth.polyphony, "ポリフォニー", 1, 16)
@@ -89,47 +104,58 @@ function parseLfo(value: unknown, label: string, pitch: boolean): LfoSettings {
   return {
     enabled: source.enabled,
     waveform: source.waveform as LfoWaveform,
-    frequency: readNumber(source.frequency, `${label} 速さ`, 0.1, 2000),
+    frequency: readNumber(source.frequency, `${label} 速さ`, 0.01, 2000),
     depth: readNumber(source.depth, `${label} 深さ`, 0, pitch ? 200 : 0.5)
   };
 }
 
 function parseEffects(value: unknown): EffectConfiguration {
   const source = asRecord(value, "エフェクト設定");
+  const distortion = asRecord(source.distortion, "ディストーション");
+  const chorus = asRecord(source.chorus, "コーラス");
+  const compressor = asRecord(source.compressor, "コンプレッサー");
+  const eq = asRecord(source.eq, "EQ");
+  const delay = asRecord(source.delay, "ディレイ");
+  const reverb = asRecord(source.reverb, "リバーブ");
   const result: EffectConfiguration = {
     distortion: {
-      enabled: readBoolean(asRecord(source.distortion, "ディストーション").enabled, "ディストーション"),
-      wet: readNumber(asRecord(source.distortion, "ディストーション").wet, "ディストーション混ざり", 0, 1),
-      drive: readNumber(asRecord(source.distortion, "ディストーション").drive, "ディストーション歪み", 0, 100)
+      enabled: readBoolean(distortion.enabled, "ディストーション"),
+      wet: readNumber(distortion.wet, "ディストーション混ざり", 0, 1),
+      drive: readNumber(distortion.drive, "ディストーション歪み", 0, 100),
+      tone: distortion.tone === undefined ? defaultEffects.distortion.tone : readNumber(distortion.tone, "ディストーション音色", 200, 20_000)
     },
     chorus: {
-      enabled: readBoolean(asRecord(source.chorus, "コーラス").enabled, "コーラス"),
-      wet: readNumber(asRecord(source.chorus, "コーラス").wet, "コーラス混ざり", 0, 1),
-      rate: readNumber(asRecord(source.chorus, "コーラス").rate, "コーラス速さ", 0.1, 10),
-      depth: readNumber(asRecord(source.chorus, "コーラス").depth, "コーラス深さ", 0.001, 0.05)
+      enabled: readBoolean(chorus.enabled, "コーラス"),
+      wet: readNumber(chorus.wet, "コーラス混ざり", 0, 1),
+      rate: readNumber(chorus.rate, "コーラス速さ", 0.1, 10),
+      depth: readNumber(chorus.depth, "コーラス深さ", 0.001, 0.05)
     },
     compressor: {
-      enabled: readBoolean(asRecord(source.compressor, "コンプレッサー").enabled, "コンプレッサー"),
-      threshold: readNumber(asRecord(source.compressor, "コンプレッサー").threshold, "コンプレッサーしきい値", -100, 0),
-      ratio: readNumber(asRecord(source.compressor, "コンプレッサー").ratio, "コンプレッサー比率", 1, 20)
+      enabled: readBoolean(compressor.enabled, "コンプレッサー"),
+      threshold: readNumber(compressor.threshold, "コンプレッサーしきい値", -100, 0),
+      ratio: readNumber(compressor.ratio, "コンプレッサー比率", 1, 20),
+      knee: compressor.knee === undefined ? defaultEffects.compressor.knee : readNumber(compressor.knee, "コンプレッサーKnee", 0, 40),
+      attack: compressor.attack === undefined ? defaultEffects.compressor.attack : readNumber(compressor.attack, "コンプレッサーAttack", 0.001, 1),
+      release: compressor.release === undefined ? defaultEffects.compressor.release : readNumber(compressor.release, "コンプレッサーRelease", 0.01, 1)
     },
     eq: {
-      enabled: readBoolean(asRecord(source.eq, "EQ").enabled, "EQ"),
-      wet: readNumber(asRecord(source.eq, "EQ").wet, "EQ混ざり", 0, 1),
-      frequency: readNumber(asRecord(source.eq, "EQ").frequency, "EQ周波数", 20, 20_000),
-      q: readNumber(asRecord(source.eq, "EQ").q, "EQ幅", 0.1, 18),
-      gain: readNumber(asRecord(source.eq, "EQ").gain, "EQゲイン", -24, 24)
+      enabled: readBoolean(eq.enabled, "EQ"),
+      wet: readNumber(eq.wet, "EQ混ざり", 0, 1),
+      frequency: readNumber(eq.frequency, "EQ周波数", 20, 20_000),
+      q: readNumber(eq.q, "EQ幅", 0.1, 18),
+      gain: readNumber(eq.gain, "EQゲイン", -24, 24)
     },
     delay: {
-      enabled: readBoolean(asRecord(source.delay, "ディレイ").enabled, "ディレイ"),
-      wet: readNumber(asRecord(source.delay, "ディレイ").wet, "ディレイ混ざり", 0, 1),
-      time: readNumber(asRecord(source.delay, "ディレイ").time, "ディレイ間隔", 0.01, 2),
-      feedback: readNumber(asRecord(source.delay, "ディレイ").feedback, "ディレイ反復", 0, 0.8)
+      enabled: readBoolean(delay.enabled, "ディレイ"),
+      wet: readNumber(delay.wet, "ディレイ混ざり", 0, 1),
+      time: readNumber(delay.time, "ディレイ間隔", 0.01, 2),
+      feedback: readNumber(delay.feedback, "ディレイ反復", 0, 0.8)
     },
     reverb: {
-      enabled: readBoolean(asRecord(source.reverb, "リバーブ").enabled, "リバーブ"),
-      wet: readNumber(asRecord(source.reverb, "リバーブ").wet, "リバーブ混ざり", 0, 1),
-      decay: readNumber(asRecord(source.reverb).decay, "リバーブ長さ", 0.1, 5)
+      enabled: readBoolean(reverb.enabled, "リバーブ"),
+      wet: readNumber(reverb.wet, "リバーブ混ざり", 0, 1),
+      decay: readNumber(reverb.decay, "リバーブ長さ", 0.1, 5),
+      preDelay: reverb.preDelay === undefined ? defaultEffects.reverb.preDelay : readNumber(reverb.preDelay, "リバーブPre-delay", 0, 0.2)
     }
   };
   const error = validateEffects(result);

@@ -11,16 +11,18 @@ describe("computer keyboard piano input", () => {
   });
 
   it.each([
-    ["input", false],
-    ["textarea", false],
-    ["select", false],
-    ["div", true]
-  ])("does not capture piano shortcuts while editing %s", (tagName, isContentEditable) => {
-    expect(pianoNoteForKey("KeyA", false, { tagName, isContentEditable }, false)).toBeNull();
+    ["input", "text", false],
+    ["textarea", "", false],
+    ["div", "", true]
+  ])("does not capture piano shortcuts while editing %s", (tagName, inputType, isContentEditable) => {
+    expect(pianoNoteForKey("KeyA", false, { tagName, inputType, isContentEditable }, false)).toBeNull();
   });
 
-  it("allows focused buttons and the on-screen piano to use computer keys", () => {
+  it("keeps PC keys playable after changing focused controls", () => {
     expect(pianoNoteForKey("KeyA", false, { tagName: "BUTTON" }, false)).toBe(60);
+    expect(pianoNoteForKey("KeyA", false, { tagName: "INPUT", inputType: "range" }, false)).toBe(60);
+    expect(pianoNoteForKey("KeyA", false, { tagName: "INPUT", inputType: "number" }, false)).toBe(60);
+    expect(pianoNoteForKey("KeyA", false, { tagName: "SELECT" }, false)).toBe(60);
   });
 
   it("ignores key-repeat, modifier shortcuts, and unrelated keys", () => {

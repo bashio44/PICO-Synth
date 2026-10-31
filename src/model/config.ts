@@ -25,6 +25,10 @@ export interface LfoSettings {
 export interface SynthSettings {
   oscillators: [OscillatorSettings, OscillatorSettings];
   envelope: EnvelopeSettings;
+  envelope2: EnvelopeSettings;
+  envelope2Enabled: boolean;
+  fmEnabled: boolean;
+  fmDepth: number;
   pitchLfo: LfoSettings;
   volumeLfo: LfoSettings;
   polyphony: number;
@@ -36,6 +40,10 @@ export const defaultSynthSettings: SynthSettings = {
     { waveform: "sine", volume: 0.25, semitones: 0, cents: 0 }
   ],
   envelope: { attack: 0.08, decay: 0.22, sustain: 0.65, release: 0.35 },
+  envelope2: { attack: 0.08, decay: 0.22, sustain: 0.65, release: 0.35 },
+  envelope2Enabled: false,
+  fmEnabled: false,
+  fmDepth: 100,
   pitchLfo: { enabled: false, waveform: "sine", frequency: 5, depth: 35 },
   volumeLfo: { enabled: false, waveform: "sine", frequency: 4, depth: 0.25 },
   polyphony: 8

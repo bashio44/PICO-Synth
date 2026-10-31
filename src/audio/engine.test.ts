@@ -4,15 +4,19 @@ import { defaultSynthSettings } from "../model/config";
 
 class FakeAudioParam {
   value = 0;
+  events: Array<{ method: string; value: number; time?: number }> = [];
   setValueAtTime(value: number): void { this.value = value; }
-  setTargetAtTime(value: number): void { this.value = value; }
-  linearRampToValueAtTime(value: number): void { this.value = value; }
+  setTargetAtTime(value: number, time?: number): void { this.value = value; this.events.push({ method: "target", value, time }); }
+  linearRampToValueAtTime(value: number, time?: number): void { this.value = value; this.events.push({ method: "ramp", value, time }); }
   cancelScheduledValues(): void {}
 }
 
 class FakeNode {
-  connect(): void {}
-  disconnect(): void {}
+  connections: unknown[] = [];
+  connect(destination?: unknown): void { this.connections.push(destination); }
+  disconnect(destination?: unknown): void {
+    this.connections = destination === undefined ? [] : this.connections.filter((connection) => connection !== destination);
+  }
 }
 
 class FakeGain extends FakeNode {
@@ -53,11 +57,16 @@ class FakeAudioContext {
   state: AudioContextState = "running";
   destination = new FakeNode() as unknown as AudioDestinationNode;
   oscillators: FakeOscillator[] = [];
+  gains: FakeGain[] = [];
   bufferSources: FakeBufferSource[] = [];
   filters: FakeFilter[] = [];
   async resume(): Promise<void> {}
   async suspend(): Promise<void> { this.state = "suspended"; }
-  createGain(): GainNode { return new FakeGain() as unknown as GainNode; }
+  createGain(): GainNode {
+    const gain = new FakeGain();
+    this.gains.push(gain);
+    return gain as unknown as GainNode;
+  }
   createOscillator(): OscillatorNode {
     const oscillator = new FakeOscillator();
     this.oscillators.push(oscillator);
@@ -149,5 +158,77 @@ describe("AudioEngine live voice parameters", () => {
     engine.setSettings(settings);
     expect(noise.stopCount).toBe(1);
     expect(context.oscillators.some((oscillator) => oscillator.type === "triangle")).toBe(true);
+  });
+
+  it("uses separate ADSR envelopes for OSC 1 and OSC 2 when enabled", async () => {
+    const context = new FakeAudioContext();
+    vi.stubGlobal("AudioContext", class extends FakeAudioContext {
+      constructor() { super(); return context; }
+    });
+    const engine = new AudioEngine();
+    await engine.start();
+    const settings = structuredClone(defaultSynthSettings);
+    settings.envelope = { attack: 0.1, decay: 0.2, sustain: 0.8, release: 0.3 };
+    settings.envelope2 = { attack: 0.4, decay: 0.1, sustain: 0.25, release: 0.7 };
+    settings.envelope2Enabled = true;
+    engine.setSettings(settings);
+    engine.noteOn(60);
+
+    const master = context.gains.find((gain) => gain.connections.includes(context.destination));
+    const volumeVca = context.gains.find((gain) => gain.connections.includes(master));
+    const envelopes = context.gains.filter((gain) => gain.connections.includes(volumeVca));
+    expect(envelopes).toHaveLength(2);
+    const attackTimes = envelopes.map((gain) =>
+      gain.gain.events.find((event) => event.method === "ramp")?.time
+    );
+    expect(attackTimes).toContain(0.1);
+    expect(attackTimes).toContain(0.4);
+  });
+
+  it("uses OSC 1 ADSR for both oscillators while OSC 2's separate setting is disabled", async () => {
+    const context = new FakeAudioContext();
+    vi.stubGlobal("AudioContext", class extends FakeAudioContext {
+      constructor() { super(); return context; }
+    });
+    const engine = new AudioEngine();
+    await engine.start();
+    const settings = structuredClone(defaultSynthSettings);
+    settings.envelope.attack = 0.12;
+    settings.envelope2.attack = 0.4;
+    settings.envelope2Enabled = false;
+    engine.setSettings(settings);
+    engine.noteOn(60);
+
+    const master = context.gains.find((gain) => gain.connections.includes(context.destination));
+    const volumeVca = context.gains.find((gain) => gain.connections.includes(master));
+    const envelopes = context.gains.filter((gain) => gain.connections.includes(volumeVca));
+    const attackTimes = envelopes.map((gain) =>
+      gain.gain.events.find((event) => event.method === "ramp")?.time
+    );
+    expect(attackTimes).toEqual([0.12, 0.12]);
+  });
+
+  it("routes OSC 2 into OSC 1 pitch and suppresses its direct output when FM is on", async () => {
+    const context = new FakeAudioContext();
+    vi.stubGlobal("AudioContext", class extends FakeAudioContext {
+      constructor() { super(); return context; }
+    });
+    const engine = new AudioEngine();
+    await engine.start();
+    const settings = structuredClone(defaultSynthSettings);
+    settings.fmEnabled = true;
+    settings.fmDepth = 250;
+    settings.oscillators[1].volume = 0.4;
+    engine.setSettings(settings);
+    engine.noteOn(69);
+
+    const carrier = context.oscillators.find((oscillator) => oscillator.frequency.value === 440)!;
+    const modulator = context.oscillators.filter((oscillator) => oscillator.frequency.value === 440)[1];
+    const modulationGain = context.gains.find((gain) => gain.connections.includes(carrier.frequency));
+    expect(modulationGain?.gain.value).toBe(100);
+    expect(modulator.connections).toContain(modulationGain);
+    expect(modulator.connections.some((connection) =>
+      connection instanceof FakeGain && connection !== modulationGain && connection.gain.value === 0
+    )).toBe(true);
   });
 });

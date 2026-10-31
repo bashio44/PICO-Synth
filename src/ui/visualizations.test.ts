@@ -30,12 +30,16 @@ describe("effect response previews", () => {
   it("redraws when any displayed sound parameter changes", () => {
     const changes: Array<[EffectId, (state: typeof defaultEffects) => void]> = [
       ["distortion", (state) => { state.distortion.drive += 1; }],
+      ["distortion", (state) => { state.distortion.tone -= 100; }],
       ["distortion", (state) => { state.distortion.wet -= 0.1; }],
       ["chorus", (state) => { state.chorus.rate += 0.1; }],
       ["chorus", (state) => { state.chorus.depth += 0.001; }],
       ["chorus", (state) => { state.chorus.wet += 0.1; }],
       ["compressor", (state) => { state.compressor.threshold += 1; }],
       ["compressor", (state) => { state.compressor.ratio += 0.1; }],
+      ["compressor", (state) => { state.compressor.knee += 1; }],
+      ["compressor", (state) => { state.compressor.attack += 0.001; }],
+      ["compressor", (state) => { state.compressor.release += 0.01; }],
       ["eq", (state) => { state.eq.frequency += 10; }],
       ["eq", (state) => { state.eq.q += 0.1; }],
       ["eq", (state) => { state.eq.gain += 0.5; }],
@@ -44,6 +48,7 @@ describe("effect response previews", () => {
       ["delay", (state) => { state.delay.feedback += 0.01; }],
       ["delay", (state) => { state.delay.wet += 0.01; }],
       ["reverb", (state) => { state.reverb.decay += 0.1; }],
+      ["reverb", (state) => { state.reverb.preDelay += 0.005; }],
       ["reverb", (state) => { state.reverb.wet += 0.1; }]
     ];
     for (const [id, mutate] of changes) {
@@ -52,5 +57,21 @@ describe("effect response previews", () => {
       mutate(changed);
       expect(effectPreviewSvg(id, changed), `${id} preview should react to its controls`).not.toBe(effectPreviewSvg(id, original));
     }
+  });
+
+  it("uses the time axis and direct/delayed mix for the delay graph", () => {
+    const settings = structuredClone(defaultEffects);
+    settings.delay.time = 0.75;
+    settings.delay.wet = 0.4;
+    const svg = effectPreviewSvg("delay", settings);
+    expect(svg).toContain("0 秒");
+    expect(svg).toContain("2 秒");
+    expect(svg).toContain('cy="31.8"');
+    expect(svg).toContain('cy="40.2"');
+  });
+
+  it("labels chorus and reverb graphs by time and amplitude", () => {
+    expect(effectPreviewSvg("chorus", structuredClone(defaultEffects))).toContain("時間");
+    expect(effectPreviewSvg("reverb", structuredClone(defaultEffects))).toContain("振幅");
   });
 });
