@@ -1082,18 +1082,11 @@ presetLoadButton.addEventListener("click", async () => {
     const response = await fetch(new URL(`presets/${presetName}.json`, document.baseURI));
     if (!response.ok) throw new Error(`サンプル音色を読み込めませんでした（HTTP ${response.status}）。`);
     const imported = parseAppSettings(await response.text());
-    stopMidiTransport(true);
     Object.assign(settings, imported.synth);
     Object.assign(effectSettings, imported.effects);
     routing = imported.routing;
-    loadedMidi = imported.midi;
     syncSettingsToUI();
     engine.setSettings(settings);
-    midiPlayButton.disabled = !loadedMidi?.notes.length;
-    midiStopButton.disabled = !loadedMidi?.notes.length;
-    midiStatus.textContent = "サンプル音色を読み込みました。";
-    midiProgress.max = 1;
-    midiProgress.value = 0;
     const graphReady = rebuildEffectsGraph();
     status.textContent = graphReady ? "サンプル音色を読み込みました。" : document.querySelector<HTMLParagraphElement>("#route-message")!.textContent;
   } catch (error) {

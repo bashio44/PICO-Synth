@@ -68,9 +68,29 @@
     "eq": {
       "enabled": true,
       "wet": 1,
-      "frequency": 1400,
-      "q": 0.9,
-      "gain": 3
+      "bands": [
+        {
+          "enabled": true,
+          "type": "highpass",
+          "frequency": 100,
+          "q": 0.707,
+          "gain": 0
+        },
+        {
+          "enabled": true,
+          "type": "peaking",
+          "frequency": 1800,
+          "q": 0.8,
+          "gain": 1.5
+        },
+        {
+          "enabled": true,
+          "type": "lowpass",
+          "frequency": 14500,
+          "q": 0.707,
+          "gain": 0
+        }
+      ]
     },
     "delay": {
       "enabled": false,

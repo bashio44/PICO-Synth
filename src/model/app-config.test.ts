@@ -134,13 +134,13 @@ describe("PICO settings JSON", () => {
     expect(() => parseAppSettings(JSON.stringify(settings))).toThrow(/曲の長さ/);
   });
 
-  it("lists thirty unique sound presets and five unique MIDI performances", () => {
+  it("lists thirty unique sound presets and ten unique MIDI performances", () => {
     const presetIds = samplePresets.map(([id]) => id);
     expect(presetIds).toHaveLength(30);
     expect(new Set(presetIds).size).toBe(presetIds.length);
     expect(presetIds[0]).toBe("sine");
     const midiIds = midiSamples.map(([id]) => id);
-    expect(midiIds).toHaveLength(5);
+    expect(midiIds).toHaveLength(10);
     expect(new Set(midiIds).size).toBe(midiIds.length);
   });
 
@@ -149,10 +149,21 @@ describe("PICO settings JSON", () => {
       const file = await readFile(new URL(`../../public/presets/${id}.json`, import.meta.url), "utf8");
       const parsed = parseAppSettings(file);
       expect(parsed.synth.oscillators).toHaveLength(2);
+      expect(parsed.effects.eq.bands).toHaveLength(3);
+      if (id === "sine") {
+        expect(parsed.effects.eq.enabled).toBe(false);
+      } else {
+        expect(parsed.effects.eq.enabled).toBe(true);
+        expect(parsed.effects.eq.bands.map((band) => [band.enabled, band.type])).toEqual([
+          [true, "highpass"],
+          [true, "peaking"],
+          [true, "lowpass"]
+        ]);
+      }
     }));
   });
 
-  it("parses all five bundled MIDI samples into playable notes", async () => {
+  it("parses all ten bundled MIDI samples into playable notes", async () => {
     await Promise.all(midiSamples.map(async ([id]) => {
       const file = await readFile(new URL(`../../public/midi/${id}.mid`, import.meta.url));
       const data = new Uint8Array(file).buffer;
@@ -160,5 +171,18 @@ describe("PICO settings JSON", () => {
       expect(clip.notes.length).toBeGreaterThan(0);
       expect(clip.duration).toBeGreaterThan(0);
     }));
+  });
+
+  it("includes off-beat chord stabs in the rhythmic-chords performance", async () => {
+    const file = await readFile(new URL("../../public/midi/rhythmic-chords.mid", import.meta.url));
+    const clip = parseMidiFile(new Uint8Array(file).buffer, "rhythmic-chords.mid");
+    const largestChord = Math.max(...clip.notes.map((note) =>
+      clip.notes.filter((other) => Math.abs(other.start - note.start) < 0.05).length
+    ));
+    expect(largestChord).toBeGreaterThanOrEqual(4);
+    expect(clip.notes.some((note) => {
+      const beatPosition = note.start * 112 / 60;
+      return Math.abs(beatPosition - Math.round(beatPosition)) > 0.15;
+    })).toBe(true);
   });
 });

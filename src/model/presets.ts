@@ -36,5 +36,10 @@ export const midiSamples = [
   ["moonlit-arp", "Moonlit Arpeggio", "月夜のアルペジオ"],
   ["blues-step", "Blues Step", "ブルース"],
   ["drum-groove", "Pocket Drum Groove", "ドラムグルーヴ"],
-  ["waltz", "Little Waltz", "小さなワルツ"]
+  ["waltz", "Little Waltz", "小さなワルツ"],
+  ["rhythmic-chords", "Rhythmic Chords", "リズミックコード"],
+  ["bossa-comp", "Bossa Nova Comp", "ボサノバコード"],
+  ["synth-bassline", "Synth Bassline", "シンセベースライン"],
+  ["broken-chords", "Broken Chords", "分散コード"],
+  ["night-drive", "Night Drive", "ナイトドライブ"]
 ] as const;
