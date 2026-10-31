@@ -1,11 +1,13 @@
 import "./style.css";
 import { AudioEngine } from "./audio/engine";
-import { clamp, defaultSynthSettings, type SynthSettings, type Waveform } from "./model/config";
+import { clamp, defaultSynthSettings, LFO_FREQUENCY_MAX, LFO_FREQUENCY_MIN, type SynthSettings, type Waveform } from "./model/config";
 import { MidiPlayer } from "./midi/player";
 import { parseMidiFile, type MidiClip } from "./midi/parser";
 import {
   defaultEffects,
   defaultRouting,
+  eqFilterNames,
+  eqFilterTypes,
   effectTerms,
   effectNames,
   routingNodes,
@@ -21,6 +23,7 @@ import {
   formatLfoFrequency,
   lfoFrequencyToSlider,
   lfoSliderToFrequency,
+  normalizeLfoFrequency,
   normalizeEnvelopeControl,
   type EnvelopeControl
 } from "./model/controls";
@@ -62,7 +65,7 @@ const proEffectControls: Record<EffectId, Array<[string, string, number, number,
   distortion: [["drive", "DRIVE", 0, 100, 1, "%"], ["tone", "TONE", 200, 20000, 100, " Hz"], ["wet", "MIX", 0, 1, 0.01, "%"]],
   chorus: [["rate", "RATE", 0.1, 10, 0.1, " Hz"], ["depth", "DEPTH", 0.001, 0.05, 0.001, " s"], ["wet", "MIX", 0, 1, 0.01, "%"]],
   compressor: [["threshold", "THRESH", -100, 0, 1, " dB"], ["ratio", "RATIO", 1, 20, 0.1, ":1"], ["knee", "KNEE", 0, 40, 1, " dB"], ["attack", "ATTACK", 0.001, 1, 0.001, " s"], ["release", "RELEASE", 0.01, 1, 0.01, " s"]],
-  eq: [["frequency", "FREQ", 20, 20000, 10, " Hz"], ["q", "Q", 0.1, 18, 0.1, ""], ["gain", "GAIN", -24, 24, 0.5, " dB"], ["wet", "MIX", 0, 1, 0.01, "%"]],
+  eq: [["wet", "MIX", 0, 1, 0.01, "%"]],
   delay: [["time", "TIME", 0.01, 2, 0.01, " s"], ["feedback", "FEEDBACK", 0, 0.8, 0.01, ""], ["wet", "MIX", 0, 1, 0.01, "%"]],
   reverb: [["decay", "DECAY", 0.1, 5, 0.1, " s"], ["preDelay", "PRE", 0, 0.2, 0.005, " s"], ["wet", "MIX", 0, 1, 0.01, "%"]]
 };
@@ -86,13 +89,15 @@ function oscillatorCard(index: number): string {
     </article>`;
 }
 
-function proKnob(label: string, proxy: string, min: number, max: number, step: number, value: number, unit: string): string {
+function proKnob(label: string, proxy: string, min: number, max: number, step: number, value: number, unit: string, disabled = false): string {
     const fraction = (value - min) / (max - min);
     const angle = -135 + fraction * 270;
-    const display = unit === "%"
-      ? `${Math.round(value * (proxy.endsWith("-wet") || proxy.startsWith("volume-") ? 100 : 1))}%`
-      : `${value}${unit}`;
-    return `<label class="pro-control"><span class="pro-control-label">${label}</span><span class="pro-dial" style="--dial-angle:${angle}deg"><input type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-proxy="${proxy}" aria-label="${label}"><span class="pro-dial-face"></span></span><output>${display}</output></label>`;
+    const display = proxy.endsWith("-freq-number")
+      ? `${formatLfoFrequency(value)} Hz`
+      : unit === "%"
+        ? `${Math.round(value * (proxy.endsWith("-wet") || proxy.startsWith("volume-") ? 100 : 1))}%`
+        : `${value}${unit}`;
+    return `<label class="pro-control"><span class="pro-control-label">${label}</span><span class="pro-dial" style="--dial-angle:${angle}deg"><input type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-proxy="${proxy}" aria-label="${label}" ${disabled ? "disabled" : ""}><span class="pro-dial-face"></span></span><output>${display}</output></label>`;
 }
 
 function proToggle(label: string, proxy: string, checked: boolean): string {
@@ -124,7 +129,7 @@ function proLfoPanel(key: "pitchLfo" | "volumeLfo"): string {
     const lfo = settings[key];
     const pitch = key === "pitchLfo";
     const target = pitch ? "pitch" : "amp";
-    return `<article class="pro-module pro-lfo"><div class="pro-module-heading"><span class="pro-module-index">LFO</span><div><h3>${pitch ? "PITCH MOD" : "AMP MOD"}</h3><p>${pitch ? "FREQUENCY MOVEMENT" : "VOLUME MOVEMENT"}</p></div>${proToggle("ON", `${key}-enabled`, lfo.enabled)}</div><label class="pro-select"><span>SHAPE</span><select data-proxy="${key}-wave" aria-label="${pitch ? "Pitch" : "Amplitude"} LFO waveform">${(["sine", "triangle", "square", "sawtooth"] as const).map((wave) => `<option value="${wave}" ${lfo.waveform === wave ? "selected" : ""}>${wave.toUpperCase()}</option>`).join("")}</select></label><div class="pro-knob-row">${proKnob("RATE", `${key}-freq-number`, 0.01, 2000, 0.0001, lfo.frequency, " Hz")}${proKnob("DEPTH", `${key}-depth`, 0, pitch ? 200 : 0.5, pitch ? 1 : 0.01, lfo.depth, pitch ? " ct" : "")}</div><span class="pro-mod-target">TARGET · ${target}</span></article>`;
+    return `<article class="pro-module pro-lfo"><div class="pro-module-heading"><span class="pro-module-index">LFO</span><div><h3>${pitch ? "PITCH MOD" : "AMP MOD"}</h3><p>${pitch ? "FREQUENCY MOVEMENT" : "VOLUME MOVEMENT"}</p></div>${proToggle("ON", `${key}-enabled`, lfo.enabled)}</div><label class="pro-select"><span>SHAPE</span><select data-proxy="${key}-wave" aria-label="${pitch ? "Pitch" : "Amplitude"} LFO waveform">${(["sine", "triangle", "square", "sawtooth"] as const).map((wave) => `<option value="${wave}" ${lfo.waveform === wave ? "selected" : ""}>${wave.toUpperCase()}</option>`).join("")}</select></label><div class="pro-knob-row">${proKnob("RATE", `${key}-freq-number`, LFO_FREQUENCY_MIN, LFO_FREQUENCY_MAX, 0.1, lfo.frequency, " Hz")}${proKnob("DEPTH", `${key}-depth`, 0, pitch ? 200 : 0.5, pitch ? 1 : 0.01, lfo.depth, pitch ? " ct" : "")}</div><span class="pro-mod-target">TARGET · ${target}</span></article>`;
 }
 
 function proEffectPanel(id: EffectId, name: string, index: number): string {
@@ -133,7 +138,11 @@ function proEffectPanel(id: EffectId, name: string, index: number): string {
       const value = effectValue(id, prop);
       return proKnob(label, `${id}-${prop}`, min, max, step, value, unit);
     }).join("");
-    return `<article class="pro-module pro-fx-module"><div class="pro-module-heading"><span class="pro-module-index">${String(index + 1).padStart(2, "0")}</span><div><h3>${name}</h3><p>${effectTerms[id].toUpperCase()} · INSERT</p></div>${proToggle("ON", `effect-${id}`, config.enabled)}</div><div class="pro-knob-row">${controls}</div></article>`;
+    const eqControls = id === "eq"
+      ? `<div class="pro-eq-mix">${proKnob("MIX", "eq-wet", 0, 1, 0.01, effectSettings.eq.wet, "%")}</div><div class="pro-eq-bands">${effectSettings.eq.bands.map((band, bandIndex) => `<div class="pro-eq-band"><div class="pro-eq-band-head"><strong>0${bandIndex + 1}</strong>${proToggle("ON", `eq-band-${bandIndex}-enabled`, band.enabled)}<select data-proxy="eq-band-${bandIndex}-type" aria-label="EQ band ${bandIndex + 1} filter type">${eqFilterTypes.map((type) => `<option value="${type}" ${band.type === type ? "selected" : ""}>${eqFilterNames[type].toUpperCase()}</option>`).join("")}</select></div><div class="pro-knob-row pro-eq-knobs">${proKnob("FREQ", `eq-band-${bandIndex}-frequency`, 20, 20000, 10, band.frequency, " Hz")}${proKnob("Q", `eq-band-${bandIndex}-q`, 0.1, 18, 0.1, band.q, "")}${proKnob("GAIN", `eq-band-${bandIndex}-gain`, -24, 24, 0.5, band.gain, " dB", band.type !== "peaking")}</div></div>`).join("")}</div>`
+      : "";
+    const body = id === "eq" ? eqControls : `<div class="pro-knob-row">${controls}</div>`;
+    return `<article class="pro-module pro-fx-module ${id === "eq" ? "pro-fx-eq" : ""}"><div class="pro-module-heading"><span class="pro-module-index">${String(index + 1).padStart(2, "0")}</span><div><h3>${name}</h3><p>${effectTerms[id].toUpperCase()} · INSERT</p></div>${proToggle("ON", `effect-${id}`, config.enabled)}</div>${body}</article>`;
 }
 
 function proRoutingMarkup(): string {
@@ -200,17 +209,17 @@ app.innerHTML = `
       </section>
       <section class="panel card" aria-labelledby="lfo-title">
         <div class="panel-heading"><div><p class="eyebrow">ADD A LITTLE MOVEMENT</p><h2 id="lfo-title">ゆらぎをつけよう</h2></div><span class="step-badge badge-pink">03 · LFO</span></div>
-        <p class="panel-copy">音にゆらぎを加えるしくみ。20Hz以上は、音色が変わる音声レートのゆらぎだよ。</p>
+        <p class="panel-copy">音にゆらぎを加えるしくみ。0.1〜30Hzを0.1Hz刻みで設定できます。20Hz以上は音色が変わる音声レートのゆらぎです。</p>
         <div class="lfo-grid">
           ${(["pitchLfo", "volumeLfo"] as const).map((key) => {
             const lfo = settings[key];
             const pitch = key === "pitchLfo";
-            return `<article class="control-card lfo-card"><div class="lfo-title-row"><label class="switch-label" for="${key}-enabled"><input id="${key}-enabled" type="checkbox" data-lfo="${key}" data-prop="enabled" ${lfo.enabled ? "checked" : ""}><span class="switch"></span><span class="parameter-pair"><span>${pitch ? "音程のゆらぎ" : "音量のゆらぎ"}</span><span class="parameter-term">${pitch ? "Pitch LFO · On / Off" : "Amplitude LFO (Tremolo) · On / Off"}</span></span></label><span class="lfo-icon" aria-hidden="true">${pitch ? "↕" : "〰"}</span></div><div class="lfo-wave-visual"><svg viewBox="0 0 200 48" aria-hidden="true"><path id="${key}-wave-visual" d="${waveformPath(lfo.waveform)}"></path></svg></div><label class="field-label" for="${key}-wave"><span class="parameter-name">ゆらぎの形</span><span class="parameter-term">Waveform</span></label><select id="${key}-wave" data-lfo="${key}" data-prop="waveform"><option value="sine" ${lfo.waveform === "sine" ? "selected" : ""}>なめらか / Sine</option><option value="triangle" ${lfo.waveform === "triangle" ? "selected" : ""}>三角 / Triangle</option><option value="square" ${lfo.waveform === "square" ? "selected" : ""}>カクカク / Square</option><option value="sawtooth" ${lfo.waveform === "sawtooth" ? "selected" : ""}>ノコギリ / Sawtooth</option></select><div class="range-row lfo-range-row"><label for="${key}-freq"><span class="parameter-name">速さ（Hz）</span><span class="parameter-term">Rate · 対数スケール</span></label><input id="${key}-freq" type="range" min="0" max="10000" step="1" value="${lfoFrequencyToSlider(lfo.frequency)}" data-lfo="${key}" data-prop="frequency" aria-label="ゆらぎの速さ Rate, 0.01から2000ヘルツ"><output>${lfo.frequency} Hz</output></div><div class="lfo-frequency-number"><label for="${key}-freq-number">数値で指定 <span class="parameter-term">Hz · 0.01〜2,000</span></label><input id="${key}-freq-number" type="number" min="0.01" max="2000" step="0.0001" value="${lfo.frequency}" data-lfo="${key}" data-prop="frequency" aria-label="ゆらぎの速さを数値で指定 Hz"></div><div class="range-row lfo-range-row compact"><label for="${key}-depth"><span class="parameter-name">深さ</span><span class="parameter-term">Depth</span></label><input id="${key}-depth" type="range" min="0" max="${pitch ? 200 : 0.5}" step="${pitch ? 1 : 0.01}" value="${lfo.depth}" data-lfo="${key}" data-prop="depth" aria-label="ゆらぎの深さ Depth"><output>${lfo.depth}${pitch ? "¢" : ""}</output></div></article>`;
+            return `<article class="control-card lfo-card"><div class="lfo-title-row"><label class="switch-label" for="${key}-enabled"><input id="${key}-enabled" type="checkbox" data-lfo="${key}" data-prop="enabled" ${lfo.enabled ? "checked" : ""}><span class="switch"></span><span class="parameter-pair"><span>${pitch ? "音程のゆらぎ" : "音量のゆらぎ"}</span><span class="parameter-term">${pitch ? "Pitch LFO · On / Off" : "Amplitude LFO (Tremolo) · On / Off"}</span></span></label><span class="lfo-icon" aria-hidden="true">${pitch ? "↕" : "〰"}</span></div><div class="lfo-wave-visual"><svg viewBox="0 0 200 48" aria-hidden="true"><path id="${key}-wave-visual" d="${waveformPath(lfo.waveform)}"></path></svg></div><label class="field-label" for="${key}-wave"><span class="parameter-name">ゆらぎの形</span><span class="parameter-term">Waveform</span></label><select id="${key}-wave" data-lfo="${key}" data-prop="waveform"><option value="sine" ${lfo.waveform === "sine" ? "selected" : ""}>なめらか / Sine</option><option value="triangle" ${lfo.waveform === "triangle" ? "selected" : ""}>三角 / Triangle</option><option value="square" ${lfo.waveform === "square" ? "selected" : ""}>カクカク / Square</option><option value="sawtooth" ${lfo.waveform === "sawtooth" ? "selected" : ""}>ノコギリ / Sawtooth</option></select><div class="range-row lfo-range-row"><label for="${key}-freq"><span class="parameter-name">速さ（Hz）</span><span class="parameter-term">Rate · 対数スケール</span></label><input id="${key}-freq" type="range" min="0" max="10000" step="1" value="${lfoFrequencyToSlider(lfo.frequency)}" data-lfo="${key}" data-prop="frequency" aria-label="ゆらぎの速さ Rate, 0.1から30ヘルツ"><output>${formatLfoFrequency(lfo.frequency)} Hz</output></div><div class="lfo-frequency-number"><label for="${key}-freq-number">数値で指定 <span class="parameter-term">Hz · 0.1〜30</span></label><input id="${key}-freq-number" type="number" min="${LFO_FREQUENCY_MIN}" max="${LFO_FREQUENCY_MAX}" step="0.1" value="${formatLfoFrequency(lfo.frequency)}" data-lfo="${key}" data-prop="frequency" aria-label="ゆらぎの速さを数値で指定 Hz"></div><div class="range-row lfo-range-row compact"><label for="${key}-depth"><span class="parameter-name">深さ</span><span class="parameter-term">Depth</span></label><input id="${key}-depth" type="range" min="0" max="${pitch ? 200 : 0.5}" step="${pitch ? 1 : 0.01}" value="${lfo.depth}" data-lfo="${key}" data-prop="depth" aria-label="ゆらぎの深さ Depth"><output>${lfo.depth}${pitch ? "¢" : ""}</output></div></article>`;
           }).join("")}
         </div>
       </section>
       <section class="panel card keyboard-panel" aria-labelledby="keyboard-title">
-        <div class="panel-heading"><div><p class="eyebrow">PLAY A NOTE</p><h2 id="keyboard-title">鍵盤をひいてみよう</h2></div><span class="step-badge badge-yellow">🎹 1オクターブ</span></div>
+        <div class="panel-heading"><div><p class="eyebrow">PLAY A NOTE</p><h2 id="keyboard-title">鍵盤をひいてみよう</h2></div><span class="step-badge badge-yellow">🎹 2オクターブ</span></div>
         <p class="panel-copy">鍵盤を押している間、音が鳴るよ。下のPCキーでもひけます。</p>
         <div class="keyboard" role="group" aria-label="2オクターブのピアノ鍵盤">
           ${pianoKeyboardNotes().map((key) => `<button type="button" class="key ${key.black ? "black-key" : "white-key"}" data-note="${key.note}" aria-label="${key.label}" ${key.blackKeyPosition === undefined ? "" : `style="left:${key.blackKeyPosition}%"`}><span>${key.black ? "" : key.label.startsWith("C ") ? key.label.replace(" ", "") : key.label.split(" ")[0]}</span></button>`).join("")}
@@ -312,15 +321,34 @@ function effectCard(id: EffectId): string {
     distortion: [["drive", "歪み", "Drive", 0, 100, 1, "%"], ["tone", "音色", "Tone · Low-pass", 200, 20000, 100, " Hz"], ["wet", "音の混ざり", "Mix (Wet/Dry)", 0, 1, 0.01, "%"]],
     chorus: [["rate", "ゆらぐ速さ", "Rate", 0.1, 10, 0.1, "Hz"], ["depth", "ゆらぐ幅", "Depth", 0.001, 0.05, 0.001, "秒"], ["wet", "音の混ざり", "Mix (Wet/Dry)", 0, 1, 0.01, "%"]],
     compressor: [["threshold", "圧縮を始める音量", "Threshold", -100, 0, 1, "dB"], ["ratio", "圧縮比", "Ratio", 1, 20, 0.1, ":1"], ["knee", "圧縮のなめらかさ", "Knee", 0, 40, 1, " dB"], ["attack", "圧縮の速さ", "Attack", 0.001, 1, 0.001, " 秒"], ["release", "圧縮の戻り", "Release", 0.01, 1, 0.01, " 秒"]],
-    eq: [["frequency", "変える音の高さ", "Frequency", 20, 20000, 10, "Hz"], ["q", "変える幅", "Q", 0.1, 18, 0.1, ""], ["gain", "音の上げ下げ", "Gain", -24, 24, 0.5, "dB"], ["wet", "音の混ざり", "Mix (Wet/Dry)", 0, 1, 0.01, "%"]],
+    eq: [],
     delay: [["time", "やまびこの間隔", "Delay Time", 0.01, 2, 0.01, "秒"], ["feedback", "やまびこの回数", "Feedback", 0, 0.8, 0.01, ""], ["wet", "音の混ざり", "Mix (Wet/Dry)", 0, 1, 0.01, "%"]],
     reverb: [["decay", "ひびきの長さ", "Decay Time", 0.1, 5, 0.1, " 秒"], ["preDelay", "ひびき始めの間隔", "Pre-delay", 0, 0.2, 0.005, " 秒"], ["wet", "音の混ざり", "Mix (Wet/Dry)", 0, 1, 0.01, "%"]]
   };
-  return `<article class="effect-card"><div class="effect-heading"><label class="switch-label" for="effect-${id}"><input id="effect-${id}" type="checkbox" data-effect="${id}" data-prop="enabled" ${config.enabled ? "checked" : ""}><span class="switch"></span><span class="parameter-pair"><span>${effectNames[id]}</span><span class="parameter-term">${effectTerms[id]} · On / Bypass</span></span></label><span class="effect-symbol" aria-hidden="true">${["✦", "〰", "↘", "◒", "↗", "☁"][(["distortion", "chorus", "compressor", "eq", "delay", "reverb"] as EffectId[]).indexOf(id)]}</span></div><div class="effect-visual"><span>音の変化</span><span class="effect-visual-flow">${graphFlow}</span><div id="effect-visual-${id}">${effectPreviewSvg(id, effectSettings)}</div></div><div class="effect-controls">${controls[id].map(([prop, label, term, min, max, step, unit]) => {
-    const value = effectValue(id, prop);
-    const shown = unit === "%" ? `${Math.round(value * (prop === "wet" ? 100 : 1))}%` : `${value}${unit ? ` ${unit}` : ""}`;
-    return `<label class="effect-control" for="${id}-${prop}"><span class="parameter-pair"><span>${label}</span><span class="parameter-term">${term}</span></span><input id="${id}-${prop}" type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-effect="${id}" data-prop="${prop}" aria-label="${label} ${term}"><output>${shown}</output></label>`;
-  }).join("")}</div></article>`;
+  const controlMarkup = id === "eq"
+    ? eqControlsMarkup()
+    : controls[id].map(([prop, label, term, min, max, step, unit]) =>
+      effectControlMarkup(id, prop, label, term, min, max, step, unit)
+    ).join("");
+  return `<article class="effect-card"><div class="effect-heading"><label class="switch-label" for="effect-${id}"><input id="effect-${id}" type="checkbox" data-effect="${id}" data-prop="enabled" ${config.enabled ? "checked" : ""}><span class="switch"></span><span class="parameter-pair"><span>${effectNames[id]}</span><span class="parameter-term">${effectTerms[id]} · On / Bypass</span></span></label><span class="effect-symbol" aria-hidden="true">${["✦", "〰", "↘", "◒", "↗", "☁"][(["distortion", "chorus", "compressor", "eq", "delay", "reverb"] as EffectId[]).indexOf(id)]}</span></div><div class="effect-visual"><span>音の変化</span><span class="effect-visual-flow">${graphFlow}</span><div id="effect-visual-${id}">${effectPreviewSvg(id, effectSettings)}</div></div><div class="effect-controls">${controlMarkup}</div></article>`;
+}
+
+function effectControlMarkup(id: EffectId, prop: string, label: string, term: string, min: number, max: number, step: number, unit: string, disabled = false): string {
+  const value = effectValue(id, prop);
+  const shown = unit === "%" ? `${Math.round(value * (prop === "wet" ? 100 : 1))}%` : `${value}${unit ? ` ${unit}` : ""}`;
+  return `<label class="effect-control" for="${id}-${prop}"><span class="parameter-pair"><span>${label}</span><span class="parameter-term">${term}</span></span><input id="${id}-${prop}" type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-effect="${id}" data-prop="${prop}" aria-label="${label} ${term}" ${disabled ? "disabled" : ""}><output>${shown}</output></label>`;
+}
+
+function eqControlsMarkup(): string {
+  const mix = effectControlMarkup("eq", "wet", "音の混ざり", "Mix (Wet/Dry)", 0, 1, 0.01, "%");
+  const bands = effectSettings.eq.bands.map((band, index) => {
+    const typeOptions = eqFilterTypes.map((type) =>
+      `<option value="${type}" ${band.type === type ? "selected" : ""}>${eqFilterNames[type]}</option>`
+    ).join("");
+    const prefix = `band-${index}`;
+    return `<section class="eq-band"><div class="eq-band-heading"><strong>BAND ${index + 1}</strong><label class="switch-label" for="eq-${prefix}-enabled"><input id="eq-${prefix}-enabled" type="checkbox" data-effect="eq" data-prop="${prefix}-enabled" ${band.enabled ? "checked" : ""}><span class="switch"></span><span>ON</span></label><select id="eq-${prefix}-type" data-effect="eq" data-prop="${prefix}-type" aria-label="EQ band ${index + 1} filter type">${typeOptions}</select></div><div class="eq-band-controls">${effectControlMarkup("eq", `${prefix}-frequency`, "Frequency", "Cutoff / Center", 20, 20000, 10, "Hz")}${effectControlMarkup("eq", `${prefix}-q`, "Q", "Resonance", 0.1, 18, 0.1, "")}${effectControlMarkup("eq", `${prefix}-gain`, "Gain", "Peak only", -24, 24, 0.5, "dB", band.type !== "peaking")}</div></section>`;
+  }).join("");
+  return `<div class="eq-global-control">${mix}</div><div class="eq-band-list">${bands}</div>`;
 }
 
 function effectValue(id: EffectId, prop: string): number {
@@ -342,10 +370,10 @@ function effectValue(id: EffectId, prop: string): number {
     return effectSettings.compressor.release;
   }
   if (id === "eq") {
-    if (prop === "frequency") return effectSettings.eq.frequency;
-    if (prop === "q") return effectSettings.eq.q;
-    if (prop === "gain") return effectSettings.eq.gain;
-    return effectSettings.eq.wet;
+    if (prop === "wet") return effectSettings.eq.wet;
+    const band = eqBandFromProp(prop);
+    if (!band || band.field === "enabled" || band.field === "type") return 0;
+    return effectSettings.eq.bands[band.index][band.field];
   }
   if (id === "delay") {
     if (prop === "time") return effectSettings.delay.time;
@@ -357,11 +385,31 @@ function effectValue(id: EffectId, prop: string): number {
   return effectSettings.reverb.wet;
 }
 
+function eqBandFromProp(prop: string): { index: 0 | 1 | 2; field: "enabled" | "type" | "frequency" | "q" | "gain" } | null {
+  const match = /^band-(0|1|2)-(enabled|type|frequency|q|gain)$/.exec(prop);
+  if (!match) return null;
+  return {
+    index: Number(match[1]) as 0 | 1 | 2,
+    field: match[2] as "enabled" | "type" | "frequency" | "q" | "gain"
+  };
+}
+
+function effectControlValue(id: EffectId, prop: string): boolean | number | string {
+  if (id === "eq") {
+    if (prop === "enabled") return effectSettings.eq.enabled;
+    const band = eqBandFromProp(prop);
+    if (band) return effectSettings.eq.bands[band.index][band.field];
+  } else if (prop === "enabled") {
+    return effectSettings[id].enabled;
+  }
+  return effectValue(id, prop);
+}
+
 function isEffectId(value: string): value is EffectId {
   return Object.hasOwn(effectNames, value);
 }
 
-function updateEffectSetting(id: EffectId, prop: string, value: boolean | number): void {
+function updateEffectSetting(id: EffectId, prop: string, value: boolean | number | string): void {
   const isToggle = prop === "enabled";
   if (id === "distortion") {
     if (isToggle && typeof value === "boolean") effectSettings.distortion.enabled = value;
@@ -382,10 +430,19 @@ function updateEffectSetting(id: EffectId, prop: string, value: boolean | number
     else if (prop === "release" && typeof value === "number") effectSettings.compressor.release = value;
   } else if (id === "eq") {
     if (isToggle && typeof value === "boolean") effectSettings.eq.enabled = value;
-    else if (prop === "frequency" && typeof value === "number") effectSettings.eq.frequency = value;
-    else if (prop === "q" && typeof value === "number") effectSettings.eq.q = value;
-    else if (prop === "gain" && typeof value === "number") effectSettings.eq.gain = value;
     else if (prop === "wet" && typeof value === "number") effectSettings.eq.wet = value;
+    else {
+      const bandRef = eqBandFromProp(prop);
+      if (!bandRef) return;
+      const band = effectSettings.eq.bands[bandRef.index];
+      if (bandRef.field === "enabled" && typeof value === "boolean") band.enabled = value;
+      else if (bandRef.field === "type" && typeof value === "string") {
+        const selected = eqFilterTypes.find((type) => type === value);
+        if (selected) band.type = selected;
+      } else if (bandRef.field !== "enabled" && bandRef.field !== "type" && typeof value === "number") {
+        band[bandRef.field] = value;
+      }
+    }
   } else if (id === "delay") {
     if (isToggle && typeof value === "boolean") effectSettings.delay.enabled = value;
     else if (prop === "time" && typeof value === "number") effectSettings.delay.time = value;
@@ -404,23 +461,25 @@ function updateEffectPreview(id: EffectId): void {
   if (preview) preview.innerHTML = effectPreviewSvg(id, effectSettings);
 }
 
-document.querySelectorAll<HTMLInputElement>("[data-effect]").forEach((control) => {
+document.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-effect]").forEach((control) => {
   const update = (rebuild: boolean) => {
     const id = control.dataset.effect;
     const prop = control.dataset.prop;
     if (!id || !isEffectId(id) || !prop) return;
-    const value = control.type === "checkbox" ? control.checked : Number(control.value);
+    const value = control instanceof HTMLInputElement && control.type === "checkbox"
+      ? control.checked
+      : control instanceof HTMLSelectElement ? control.value : Number(control.value);
     updateEffectSetting(id, prop, value);
     updateEffectPreview(id);
-    if (control.type !== "checkbox") {
+    const bandRef = id === "eq" ? eqBandFromProp(prop) : null;
+    if (bandRef?.field === "type" && typeof value === "string") {
+      const gain = document.querySelector<HTMLInputElement>(`#eq-band-${bandRef.index}-gain`);
+      if (gain) gain.disabled = value !== "peaking";
+      syncProControls();
+    }
+    if (control instanceof HTMLInputElement && control.type !== "checkbox") {
       const output = control.parentElement?.querySelector("output");
-      if (output && typeof value === "number") {
-        const unit = prop === "wet" ? "%" : prop === "feedback" ? "" : prop === "ratio" ? ":1" :
-          ["time", "decay", "preDelay", "attack", "release", "depth"].includes(prop) ? " 秒" :
-          ["rate", "frequency", "tone"].includes(prop) ? " Hz" :
-            ["threshold", "gain", "knee"].includes(prop) ? " dB" : "%";
-        output.value = `${prop === "wet" ? Math.round(value * 100) : value}${unit}`;
-      }
+      if (output && typeof value === "number") output.value = effectOutput(prop, value);
     }
     if (rebuild) rebuildEffectsGraph();
   };
@@ -668,6 +727,10 @@ function isEffectEnabled(id: EffectId): boolean {
 
 function effectOutput(prop: string, value: number): string {
   if (prop === "wet") return `${Math.round(value * 100)}%`;
+  const band = eqBandFromProp(prop);
+  if (band?.field === "frequency") return `${value} Hz`;
+  if (band?.field === "gain") return `${value} dB`;
+  if (band?.field === "q") return String(value);
   if (["time", "decay", "preDelay", "attack", "release", "depth"].includes(prop)) return `${value} 秒`;
   if (["rate", "frequency", "tone"].includes(prop)) return `${value} Hz`;
   if (["threshold", "gain", "knee"].includes(prop)) return `${value} dB`;
@@ -739,16 +802,22 @@ function syncSettingsToUI(): void {
       if (path) path.setAttribute("d", waveformPath(lfo.waveform));
     }
   });
-  document.querySelectorAll<HTMLInputElement>("[data-effect]").forEach((control) => {
+  document.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-effect]").forEach((control) => {
     const id = control.dataset.effect;
     const prop = control.dataset.prop;
     if (!id || !isEffectId(id) || !prop) return;
-    if (control.type === "checkbox") control.checked = isEffectEnabled(id);
+    const value = effectControlValue(id, prop);
+    if (control instanceof HTMLInputElement && control.type === "checkbox") {
+      control.checked = typeof value === "boolean" ? value : isEffectEnabled(id);
+    }
     else {
-      const value = effectValue(id, prop);
       control.value = String(value);
-      const output = control.parentElement?.querySelector("output");
-      if (output) output.value = effectOutput(prop, value);
+      if (control instanceof HTMLInputElement) {
+        const band = id === "eq" ? eqBandFromProp(prop) : null;
+        if (band?.field === "gain") control.disabled = effectSettings.eq.bands[band.index].type !== "peaking";
+        const output = control.parentElement?.querySelector("output");
+        if (output && typeof value === "number") output.value = effectOutput(prop, value);
+      }
     }
     updateEffectPreview(id);
   });
@@ -1244,7 +1313,7 @@ document.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-lfo]").fo
     if (prop === "frequency" && control instanceof HTMLInputElement) {
       lfo.frequency = control.type === "range"
         ? lfoSliderToFrequency(Number(control.value))
-        : clamp(Number(control.value), 0.01, 2000);
+        : normalizeLfoFrequency(Number(control.value));
       document.querySelector<HTMLInputElement>(`#${key}-freq`)!.value = String(lfoFrequencyToSlider(lfo.frequency));
       document.querySelector<HTMLInputElement>(`#${key}-freq-number`)!.value = formatLfoFrequency(lfo.frequency);
     }

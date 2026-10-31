@@ -153,7 +153,7 @@ footer span span { color: #f0807f; }
 .envelope-stages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 0 8px 9px; color: #716d82; font-size: 9px; text-align: center; }
 .envelope-stages small { display: block; margin-top: 2px; color: #827d91; font-size: 8px; font-weight: 500; }
 .envelope-toggle { margin: 4px 0 11px; }
-.envelope-editors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.envelope-editors { display: grid; grid-template-columns: 1fr; gap: 10px; }
 .envelope-channel { min-width: 0; border: 1px solid #eee9f5; border-radius: 12px; background: #fdfbff; padding: 10px; }
 .envelope-channel h3 { margin: 0 0 8px; color: #5d5872; font-size: 10px; }
 .envelope-channel.is-disabled { opacity: .48; filter: grayscale(.65); pointer-events: none; }
@@ -242,6 +242,23 @@ footer span span { color: #f0807f; }
 .effect-control .parameter-term { font-size: 7px; }
 .effect-control input { min-width: 0; accent-color: #7657ee; }
 .effect-control output { color: #716d82; font-size: 9px; text-align: right; }
+.eq-global-control { display: flex; justify-content: flex-end; }
+.eq-global-control .effect-control { max-width: 280px; }
+.eq-band-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.eq-band { min-width: 0; border: 1px solid #e9e3ef; border-radius: 9px; background: #fff; padding: 8px; }
+.eq-band-heading { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 5px; margin-bottom: 8px; }
+.eq-band-heading > strong { color: #77718d; font-size: 8px; letter-spacing: .5px; }
+.eq-band-heading .switch-label { gap: 4px; font-size: 8px; }
+.eq-band-heading .switch { width: 25px; height: 15px; }
+.eq-band-heading .switch::after { width: 9px; height: 9px; }
+.eq-band-heading .switch-label input:checked + .switch::after { transform: translateX(10px); }
+.eq-band-heading select { width: 100%; min-width: 0; height: 28px; border: 1px solid #e6e1ef; border-radius: 7px; background: #fff; color: #514975; padding: 0 5px; font: inherit; font-size: 8px; }
+.eq-band-controls { display: grid; gap: 6px; }
+.eq-band-controls .effect-control { grid-template-columns: minmax(0, 1fr) 45px; gap: 3px 5px; font-size: 8px; }
+.eq-band-controls .effect-control .parameter-pair { grid-column: 1 / -1; }
+.eq-band-controls .effect-control .parameter-term { font-size: 7px; }
+.eq-band-controls .effect-control output { font-size: 8px; }
+.eq-band-controls .effect-control input:disabled { opacity: .35; }
 .routing-panel { margin-top: 13px; }
 .routing-diagram { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 14px; border-radius: 12px; background: linear-gradient(110deg, #f8f5ff, #f2fbff); }
 .route-node { display: inline-flex; align-items: center; min-height: 28px; border: 1px solid #e8e1f4; border-radius: 8px; background: white; color: #514975; padding: 5px 8px; font-size: 9px; }
@@ -580,6 +597,28 @@ h2 { font-size: 19px; line-height: 1.35; }
 .pro-fx-module .pro-dial::after { top: 3px; height: 6px; transform-origin: 1px 14px; }
 .pro-fx-module .pro-dial-face { width: 7px; height: 7px; }
 .pro-fx-module .pro-control output { font-size: 7px; }
+.pro-eq-mix { display: flex; justify-content: flex-end; border-bottom: 1px solid #46425d; padding-bottom: 5px; }
+.pro-eq-mix .pro-control { grid-template-columns: auto auto; align-items: center; gap: 4px; }
+.pro-eq-mix .pro-control-label { grid-column: 1 / -1; }
+.pro-eq-mix .pro-dial { width: 28px; height: 28px; }
+.pro-eq-mix .pro-dial::after { top: 3px; height: 5px; transform-origin: 1px 11px; }
+.pro-eq-mix .pro-dial-face { width: 6px; height: 6px; }
+.pro-eq-bands { display: grid; gap: 3px; }
+.pro-eq-band { display: grid; grid-template-columns: 62px minmax(0, 1fr); align-items: center; gap: 4px; border-bottom: 1px solid #46425d; padding: 3px 0; }
+.pro-eq-band:last-child { border-bottom: 0; }
+.pro-eq-band-head { display: grid; grid-template-columns: auto auto; align-items: center; gap: 3px; }
+.pro-eq-band-head strong { color: #aaa5c0; font-size: 6px; }
+.pro-eq-band-head .pro-toggle { font-size: 6px; }
+.pro-eq-band-head select { grid-column: 1 / -1; width: 100%; min-width: 0; height: 20px; border: 1px solid #4d4965; border-radius: 6px; background: #222238; color: #f7f5ff; padding: 0 4px; font: inherit; font-size: 6px; }
+.pro-eq-knobs { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; }
+.pro-eq-knobs .pro-control { gap: 1px; }
+.pro-eq-knobs .pro-control-label { font-size: 5px; }
+.pro-eq-knobs .pro-dial { width: 27px; height: 27px; }
+.pro-eq-knobs .pro-dial input { inset: -3px; width: calc(100% + 6px); height: calc(100% + 6px); }
+.pro-eq-knobs .pro-dial::after { top: 2px; height: 5px; transform-origin: 1px 11px; }
+.pro-eq-knobs .pro-dial-face { width: 5px; height: 5px; }
+.pro-eq-knobs .pro-control output { min-height: 8px; font-size: 6px; }
+.pro-eq-knobs .pro-control:has(input:disabled) { opacity: .4; }
 .pro-routing-module { margin-top: 8px; padding: 9px 11px; }
 .pro-routing-module .pro-module-heading { margin-bottom: 7px; }
 .pro-routing-controls { display: flex; align-items: center; gap: 7px; }
@@ -605,6 +644,7 @@ h2 { font-size: 19px; line-height: 1.35; }
   .pro-oscillator, .pro-envelope-module, .pro-lfo-bank, .pro-keyboard-module { grid-column: auto; }
   .pro-envelope-module { display: block; }
   .pro-fx-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .eq-band-list { grid-template-columns: 1fr; }
   .pro-fx-module:has(.pro-control:nth-child(5)) .pro-knob-row { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .pro-midi-controls { flex-wrap: wrap; }
   .pro-midi-controls select { flex: 1 1 140px; }

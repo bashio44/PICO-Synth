@@ -4,6 +4,7 @@ import {
   lfoFrequencyToSlider,
   lfoSliderToFrequency,
   formatLfoFrequency,
+  normalizeLfoFrequency,
   normalizeEnvelopeControl
 } from "./controls";
 
@@ -30,19 +31,22 @@ describe("ADSR control precision", () => {
 });
 
 describe("LFO frequency slider mapping", () => {
-  it.each([0.01, 0.1, 0.5, 1, 5, 20, 440, 2_000])("round-trips %s Hz", (frequency) => {
-    expect(lfoSliderToFrequency(lfoFrequencyToSlider(frequency))).toBeCloseTo(frequency, 0);
+  it.each([0.1, 0.2, 0.5, 1, 5, 20, 29.9, 30])("round-trips %s Hz", (frequency) => {
+    expect(lfoSliderToFrequency(lfoFrequencyToSlider(frequency))).toBe(frequency);
   });
 
   it("uses the full slider range for the supported frequency range", () => {
-    expect(lfoFrequencyToSlider(0.01)).toBe(0);
-    expect(lfoFrequencyToSlider(2_000)).toBe(10_000);
+    expect(lfoFrequencyToSlider(0.1)).toBe(0);
+    expect(lfoFrequencyToSlider(30)).toBe(10_000);
     expect(lfoFrequencyToSlider(5)).toBeGreaterThan(3_000);
-    expect(lfoFrequencyToSlider(5)).toBeLessThan(6_000);
+    expect(lfoFrequencyToSlider(5)).toBeLessThan(8_000);
   });
 
-  it("preserves intermediate frequencies for direct numeric entry", () => {
-    expect(formatLfoFrequency(0.0137)).toBe("0.0137");
-    expect(formatLfoFrequency(5.2374)).toBe("5.2374");
+  it("normalizes and displays rates to one decimal place", () => {
+    expect(normalizeLfoFrequency(5.26)).toBe(5.3);
+    expect(normalizeLfoFrequency(0.03)).toBe(0.1);
+    expect(normalizeLfoFrequency(30.01)).toBe(30);
+    expect(formatLfoFrequency(5.26)).toBe("5.3");
+    expect(formatLfoFrequency(5)).toBe("5.0");
   });
 });

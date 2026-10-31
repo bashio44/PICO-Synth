@@ -150,15 +150,24 @@ export class EffectsGraphBuilder {
       }
       case "eq": {
         const params = config as EffectSettingsById["eq"];
-        const filter = context.createBiquadFilter();
-        filter.type = "peaking";
-        filter.frequency.value = Math.min(params.frequency, context.sampleRate / 2);
-        filter.Q.value = params.q;
-        filter.gain.value = params.gain;
-        processor = filter;
-        outputProcessor = processor;
-        nodes.push(filter);
-        break;
+        const filters = params.bands.filter((band) => band.enabled).map((band) => {
+          const filter = context.createBiquadFilter();
+          filter.type = band.type;
+          filter.frequency.value = Math.min(band.frequency, context.sampleRate / 2);
+          filter.Q.value = band.q;
+          filter.gain.value = band.gain;
+          nodes.push(filter);
+          return filter;
+        });
+        if (filters.length === 0) {
+          input.connect(wet);
+        } else {
+          input.connect(filters[0]);
+          for (let index = 1; index < filters.length; index++) filters[index - 1].connect(filters[index]);
+          filters[filters.length - 1].connect(wet);
+        }
+        wet.connect(output);
+        return { input, output, nodes, sources };
       }
       case "delay": {
         const params = config as EffectSettingsById["delay"];

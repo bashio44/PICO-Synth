@@ -40,9 +40,10 @@ describe("effect response previews", () => {
       ["compressor", (state) => { state.compressor.knee += 1; }],
       ["compressor", (state) => { state.compressor.attack += 0.001; }],
       ["compressor", (state) => { state.compressor.release += 0.01; }],
-      ["eq", (state) => { state.eq.frequency += 10; }],
-      ["eq", (state) => { state.eq.q += 0.1; }],
-      ["eq", (state) => { state.eq.gain += 0.5; }],
+      ["eq", (state) => { state.eq.bands[0].frequency += 10; }],
+      ["eq", (state) => { state.eq.bands[0].q += 0.1; }],
+      ["eq", (state) => { state.eq.bands[0].gain += 0.5; }],
+      ["eq", (state) => { state.eq.bands[1].enabled = true; }],
       ["eq", (state) => { state.eq.wet -= 0.1; }],
       ["delay", (state) => { state.delay.time += 0.01; }],
       ["delay", (state) => { state.delay.feedback += 0.01; }],
@@ -73,5 +74,26 @@ describe("effect response previews", () => {
   it("labels chorus and reverb graphs by time and amplitude", () => {
     expect(effectPreviewSvg("chorus", structuredClone(defaultEffects))).toContain("時間");
     expect(effectPreviewSvg("reverb", structuredClone(defaultEffects))).toContain("振幅");
+  });
+
+  it("draws distinct response curves and markers for each EQ filter type", () => {
+    const types = ["peaking", "notch", "highpass", "lowpass"] as const;
+    const responses = types.map((type) => {
+      const settings = structuredClone(defaultEffects);
+      settings.eq.bands[0] = { enabled: true, type, frequency: 1_000, q: 1.2, gain: 8 };
+      return effectPreviewSvg("eq", settings);
+    });
+    expect(new Set(responses).size).toBe(types.length);
+    expect(effectPreviewSvg("eq", {
+      ...structuredClone(defaultEffects),
+      eq: {
+        ...structuredClone(defaultEffects.eq),
+        bands: [
+          structuredClone(defaultEffects.eq.bands[0]),
+          { enabled: true, type: "lowpass", frequency: 3_000, q: 1, gain: 0 },
+          { enabled: true, type: "highpass", frequency: 150, q: 0.7, gain: 0 }
+        ]
+      }
+    }).match(/class="effect-eq-center"/g)).toHaveLength(3);
   });
 });

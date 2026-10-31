@@ -170,9 +170,9 @@ describe("effect audio parameter wiring", () => {
 
   it("applies EQ frequency, Q, gain, and wet mix", () => {
     const { context } = buildEffect("eq", (effects) => {
-      effects.eq.frequency = 4_000;
-      effects.eq.q = 2.4;
-      effects.eq.gain = 6;
+      effects.eq.bands[0].frequency = 4_000;
+      effects.eq.bands[0].q = 2.4;
+      effects.eq.bands[0].gain = 6;
       effects.eq.wet = 0.6;
     });
     expect(context.filters[0].frequency.value).toBe(4_000);
@@ -180,6 +180,26 @@ describe("effect audio parameter wiring", () => {
     expect(context.filters[0].gain.value).toBe(6);
     expect(context.gains.map((node) => node.gain.value)).toContain(0.6);
     expect(context.gains.map((node) => node.gain.value)).toContain(0.4);
+  });
+
+  it("chains enabled peak, notch, and high-pass EQ bands in order", () => {
+    const { context } = buildEffect("eq", (effects) => {
+      effects.eq.bands = [
+        { enabled: true, type: "peaking", frequency: 800, q: 1.2, gain: 5 },
+        { enabled: true, type: "notch", frequency: 2_500, q: 4, gain: 0 },
+        { enabled: true, type: "highpass", frequency: 120, q: 0.7, gain: 0 }
+      ];
+    });
+    expect(context.filters.map((filter) => filter.type)).toEqual(["peaking", "notch", "highpass"]);
+    expect(context.filters.map((filter) => filter.frequency.value)).toEqual([800, 2_500, 120]);
+    expect(context.filters[0].gain.value).toBe(5);
+  });
+
+  it.each(["peaking", "notch", "highpass", "lowpass"] as const)("supports the EQ %s filter type", (type) => {
+    const { context } = buildEffect("eq", (effects) => {
+      effects.eq.bands[0].type = type;
+    });
+    expect(context.filters[0].type).toBe(type);
   });
 
   it("applies delay time, feedback, and wet mix", () => {

@@ -13,6 +13,11 @@ describe("PICO settings JSON", () => {
     settings.synth.envelope2.attack = 0.27;
     settings.synth.fmEnabled = true;
     settings.synth.fmDepth = 345;
+    settings.effects.eq.bands = [
+      { enabled: true, type: "highpass", frequency: 120, q: 0.7, gain: 0 },
+      { enabled: true, type: "peaking", frequency: 1400, q: 1.2, gain: 4.5 },
+      { enabled: false, type: "notch", frequency: 9000, q: 4, gain: 0 }
+    ];
     settings.effects.compressor.knee = 8;
     settings.effects.reverb.preDelay = 0.045;
     settings.effects.delay.enabled = true;
@@ -37,12 +42,18 @@ describe("PICO settings JSON", () => {
     expect(() => parseAppSettings(JSON.stringify(settings))).toThrow(/FM変調/);
   });
 
-  it("accepts audio-rate LFO frequencies", () => {
+  it("limits LFO frequencies to 0.1–30 Hz and normalizes to tenths", () => {
     const settings = createDefaultAppSettings();
-    settings.synth.volumeLfo.frequency = 440;
-    expect(parseAppSettings(stringifyAppSettings(settings)).synth.volumeLfo.frequency).toBe(440);
-    settings.synth.pitchLfo.frequency = 0.0137;
-    expect(parseAppSettings(stringifyAppSettings(settings)).synth.pitchLfo.frequency).toBe(0.0137);
+    settings.synth.volumeLfo.frequency = 30;
+    settings.synth.pitchLfo.frequency = 0.1;
+    expect(parseAppSettings(stringifyAppSettings(settings)).synth.volumeLfo.frequency).toBe(30);
+    expect(parseAppSettings(stringifyAppSettings(settings)).synth.pitchLfo.frequency).toBe(0.1);
+    settings.synth.pitchLfo.frequency = 5.26;
+    expect(parseAppSettings(stringifyAppSettings(settings)).synth.pitchLfo.frequency).toBe(5.3);
+    settings.synth.pitchLfo.frequency = 0.09;
+    expect(() => parseAppSettings(stringifyAppSettings(settings))).toThrow(/ピッチLFO/);
+    settings.synth.pitchLfo.frequency = 30.1;
+    expect(() => parseAppSettings(stringifyAppSettings(settings))).toThrow(/ピッチLFO/);
   });
 
   it("supports fine ADSR times and wider oscillator tuning", () => {
@@ -71,6 +82,10 @@ describe("PICO settings JSON", () => {
     delete legacy.effects.compressor.attack;
     delete legacy.effects.compressor.release;
     delete legacy.effects.reverb.preDelay;
+    delete legacy.effects.eq.bands;
+    legacy.effects.eq.frequency = 2_500;
+    legacy.effects.eq.q = 2;
+    legacy.effects.eq.gain = 3;
 
     const restored = parseAppSettings(JSON.stringify({ ...settings, ...legacy }));
     expect(restored.synth.envelope2).toEqual(settings.synth.envelope);
@@ -79,6 +94,27 @@ describe("PICO settings JSON", () => {
     expect(restored.effects.distortion.tone).toBe(settings.effects.distortion.tone);
     expect(restored.effects.compressor.knee).toBe(settings.effects.compressor.knee);
     expect(restored.effects.reverb.preDelay).toBe(settings.effects.reverb.preDelay);
+    expect(restored.effects.eq.bands[0]).toMatchObject({
+      enabled: true,
+      type: "peaking",
+      frequency: 2_500,
+      q: 2,
+      gain: 3
+    });
+    expect(restored.effects.eq.bands.slice(1).every((band) => !band.enabled)).toBe(true);
+  });
+
+  it("validates all three EQ filter bands", () => {
+    const settings = createDefaultAppSettings();
+    settings.effects.eq.bands[0].type = "notch";
+    settings.effects.eq.bands[1].type = "highpass";
+    settings.effects.eq.bands[2].type = "lowpass";
+    expect(parseAppSettings(stringifyAppSettings(settings)).effects.eq.bands.map((band) => band.type))
+      .toEqual(["notch", "highpass", "lowpass"]);
+
+    const invalid = createDefaultAppSettings();
+    invalid.effects.eq.bands[0].frequency = 20_001;
+    expect(() => parseAppSettings(stringifyAppSettings(invalid))).toThrow(/EQバンド1/);
   });
 
   it("rejects routing cycles before accepting a preset", () => {

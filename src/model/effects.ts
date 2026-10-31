@@ -1,4 +1,13 @@
 export type EffectId = "distortion" | "chorus" | "compressor" | "eq" | "delay" | "reverb";
+export type EqFilterType = "peaking" | "notch" | "highpass" | "lowpass";
+
+export const eqFilterTypes: readonly EqFilterType[] = ["peaking", "notch", "highpass", "lowpass"];
+export const eqFilterNames: Record<EqFilterType, string> = {
+  peaking: "Peak",
+  notch: "Notch",
+  highpass: "HPF",
+  lowpass: "LPF"
+};
 
 export interface WetSettings {
   enabled: boolean;
@@ -9,9 +18,17 @@ export interface EffectSettingsById {
   distortion: WetSettings & { drive: number; tone: number };
   chorus: WetSettings & { rate: number; depth: number };
   compressor: { enabled: boolean; threshold: number; ratio: number; knee: number; attack: number; release: number };
-  eq: WetSettings & { frequency: number; q: number; gain: number };
+  eq: WetSettings & { bands: [EqBandSettings, EqBandSettings, EqBandSettings] };
   delay: WetSettings & { time: number; feedback: number };
   reverb: WetSettings & { decay: number; preDelay: number };
+}
+
+export interface EqBandSettings {
+  enabled: boolean;
+  type: EqFilterType;
+  frequency: number;
+  q: number;
+  gain: number;
 }
 
 export type EffectConfiguration = {
@@ -45,7 +62,15 @@ export const defaultEffects: EffectConfiguration = {
   distortion: { enabled: false, wet: 0.35, drive: 28, tone: 12_000 },
   chorus: { enabled: false, wet: 0.3, rate: 0.8, depth: 0.012 },
   compressor: { enabled: false, threshold: -24, ratio: 4, knee: 30, attack: 0.003, release: 0.25 },
-  eq: { enabled: false, wet: 1, frequency: 1200, q: 0.8, gain: 0 },
+  eq: {
+    enabled: false,
+    wet: 1,
+    bands: [
+      { enabled: true, type: "peaking", frequency: 1200, q: 0.8, gain: 0 },
+      { enabled: false, type: "peaking", frequency: 4000, q: 1, gain: 0 },
+      { enabled: false, type: "peaking", frequency: 10_000, q: 1, gain: 0 }
+    ]
+  },
   delay: { enabled: false, wet: 0.25, time: 0.28, feedback: 0.32 },
   reverb: { enabled: false, wet: 0.2, decay: 1.8, preDelay: 0.02 }
 };
@@ -69,7 +94,7 @@ export function validateEffects(effects: EffectConfiguration): string | null {
     distortion: [["wet", 0, 1], ["drive", 0, 100], ["tone", 200, 20_000]],
     chorus: [["wet", 0, 1], ["rate", 0.1, 10], ["depth", 0.001, 0.05]],
     compressor: [["threshold", -100, 0], ["ratio", 1, 20], ["knee", 0, 40], ["attack", 0.001, 1], ["release", 0.01, 1]],
-    eq: [["wet", 0, 1], ["frequency", 20, 20_000], ["q", 0.1, 18], ["gain", -24, 24]],
+    eq: [["wet", 0, 1]],
     delay: [["wet", 0, 1], ["time", 0.01, 2], ["feedback", 0, 0.8]],
     reverb: [["wet", 0, 1], ["decay", 0.1, 5], ["preDelay", 0, 0.2]]
   };
@@ -80,6 +105,24 @@ export function validateEffects(effects: EffectConfiguration): string | null {
       const value = config[name];
       if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) {
         return `${effectNames[id]}の「${name}」は${min}〜${max}の範囲で指定してください。`;
+      }
+    }
+  }
+  const bands = (effects?.eq as unknown as Record<string, unknown> | undefined)?.bands;
+  if (!Array.isArray(bands) || bands.length !== 3) return "EQには3つのバンド設定が必要です。";
+  for (const [index, value] of bands.entries()) {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      return `EQバンド${index + 1}の設定が正しくありません。`;
+    }
+    const band = value as Record<string, unknown>;
+    if (typeof band.enabled !== "boolean") return `EQバンド${index + 1}のオン・オフ設定が正しくありません。`;
+    if (typeof band.type !== "string" || !eqFilterTypes.includes(band.type as EqFilterType)) {
+      return `EQバンド${index + 1}のフィルター形式が正しくありません。`;
+    }
+    for (const [name, min, max] of [["frequency", 20, 20_000], ["q", 0.1, 18], ["gain", -24, 24]] as const) {
+      const field = band[name];
+      if (typeof field !== "number" || !Number.isFinite(field) || field < min || field > max) {
+        return `EQバンド${index + 1}の「${name}」は${min}〜${max}の範囲で指定してください。`;
       }
     }
   }

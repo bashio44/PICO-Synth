@@ -1,5 +1,5 @@
 import type { Waveform } from "../model/config";
-import type { EffectConfiguration, EffectId } from "../model/effects";
+import type { EffectConfiguration, EffectId, EqBandSettings } from "../model/effects";
 
 const waveformSamples = 72;
 
@@ -90,11 +90,9 @@ function effectCurve(id: EffectId, effects: EffectConfiguration): string {
       });
     }
     case "eq": {
-      const { frequency, q, gain, wet } = effects.eq;
-      const center = Math.log(frequency / 20) / Math.log(20_000 / 20);
-      const width = Math.max(0.025, 0.22 / q);
       return graphPath((position) => {
-        const response = gain * wet * Math.exp(-0.5 * ((position - center) / width) ** 2);
+        const response = effects.eq.bands.reduce((total, band) =>
+          total + (band.enabled ? eqBandResponseDb(band, position) : 0), 0) * effects.eq.wet;
         return Math.max(0, Math.min(1, 0.5 + response / 48));
       });
     }
@@ -119,6 +117,17 @@ function effectCurve(id: EffectId, effects: EffectConfiguration): string {
   }
 }
 
+function eqBandResponseDb(band: EqBandSettings, position: number): number {
+  const center = Math.log(band.frequency / 20) / Math.log(20_000 / 20);
+  const offset = position - center;
+  const octaves = offset * Math.log2(20_000 / 20);
+  if (band.type === "highpass") return Math.max(-48, Math.min(0, 12 * octaves));
+  if (band.type === "lowpass") return Math.max(-48, Math.min(0, -12 * octaves));
+  const width = Math.max(0.025, 0.22 / band.q);
+  const bell = Math.exp(-0.5 * (offset / width) ** 2);
+  return band.type === "notch" ? -36 * bell : band.gain * bell;
+}
+
 export function effectPreviewSvg(id: EffectId, effects: EffectConfiguration): string {
   const config = effects[id];
   const state = config.enabled ? "on" : "off";
@@ -136,11 +145,20 @@ export function effectPreviewSvg(id: EffectId, effects: EffectConfiguration): st
         : '<text x="12" y="74">入力</text><text x="183" y="74">出力</text>';
   const paths = effectCurve(id, effects);
   const chorusPaths = id === "chorus" ? paths.split(/ (?=M)/) : [paths];
-  const eqMarker = id === "eq" ? (() => {
-    const center = 12 + Math.log(effects.eq.frequency / 20) / Math.log(20_000 / 20) * 196;
-    const width = Math.max(4, Math.min(42, 0.12 / effects.eq.q * 196));
-    return `<path class="effect-eq-band" d="M ${(center - width).toFixed(1)} 57 Q ${center.toFixed(1)} 52 ${(center + width).toFixed(1)} 57" /><path class="effect-eq-center" d="M ${center.toFixed(1)} 10 V59" />`;
-  })() : "";
+  const eqColors = ["#ff876f", "#7657ee", "#20a9a8"];
+  const eqMarker = id === "eq" ? effects.eq.bands.map((band, index) => {
+    if (!band.enabled) return "";
+    const center = 12 + Math.log(band.frequency / 20) / Math.log(20_000 / 20) * 196;
+    const width = Math.max(4, Math.min(42, 0.12 / band.q * 196));
+    const shape = band.type === "highpass"
+      ? `M 12 57 L ${center.toFixed(1)} 34`
+      : band.type === "lowpass"
+        ? `M ${center.toFixed(1)} 34 L 208 57`
+        : band.type === "notch"
+          ? `M ${(center - width).toFixed(1)} 34 Q ${center.toFixed(1)} 48 ${(center + width).toFixed(1)} 34`
+          : `M ${(center - width).toFixed(1)} 34 Q ${center.toFixed(1)} ${(34 - Math.sign(band.gain || 1) * 9).toFixed(1)} ${(center + width).toFixed(1)} 34`;
+    return `<path class="effect-eq-band" style="stroke:${eqColors[index]}" d="${shape}" /><path class="effect-eq-center" style="stroke:${eqColors[index]}" d="M ${center.toFixed(1)} 10 V59" />`;
+  }).join("") : "";
   const effectAnnotation = id === "distortion"
     ? `Tone ${effects.distortion.tone} Hz`
     : id === "compressor"

@@ -1,5 +1,7 @@
 export type Waveform = "sine" | "square" | "sawtooth" | "triangle" | "noise";
 export type LfoWaveform = "sine" | "triangle" | "square" | "sawtooth";
+export const LFO_FREQUENCY_MIN = 0.1;
+export const LFO_FREQUENCY_MAX = 30;
 
 export interface OscillatorSettings {
   waveform: Waveform;

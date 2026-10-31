@@ -1,6 +1,7 @@
 import type { MidiClip, MidiNoteData } from "../midi/parser";
-import { clamp, defaultSynthSettings, type LfoSettings, type LfoWaveform, type OscillatorSettings, type SynthSettings, type Waveform } from "./config";
-import { defaultEffects, defaultRouting, type EffectConfiguration, type RoutingEdge, validateEffects, validateRouting } from "./effects";
+import { clamp, defaultSynthSettings, LFO_FREQUENCY_MAX, LFO_FREQUENCY_MIN, type LfoSettings, type LfoWaveform, type OscillatorSettings, type SynthSettings, type Waveform } from "./config";
+import { defaultEffects, defaultRouting, eqFilterTypes, type EffectConfiguration, type EqFilterType, type RoutingEdge, validateEffects, validateRouting } from "./effects";
+import { normalizeLfoFrequency } from "./controls";
 
 export interface AppSettings {
   version: 1;
@@ -104,7 +105,7 @@ function parseLfo(value: unknown, label: string, pitch: boolean): LfoSettings {
   return {
     enabled: source.enabled,
     waveform: source.waveform as LfoWaveform,
-    frequency: readNumber(source.frequency, `${label} 速さ`, 0.01, 2000),
+    frequency: normalizeLfoFrequency(readNumber(source.frequency, `${label} 速さ`, LFO_FREQUENCY_MIN, LFO_FREQUENCY_MAX)),
     depth: readNumber(source.depth, `${label} 深さ`, 0, pitch ? 200 : 0.5)
   };
 }
@@ -141,9 +142,7 @@ function parseEffects(value: unknown): EffectConfiguration {
     eq: {
       enabled: readBoolean(eq.enabled, "EQ"),
       wet: readNumber(eq.wet, "EQ混ざり", 0, 1),
-      frequency: readNumber(eq.frequency, "EQ周波数", 20, 20_000),
-      q: readNumber(eq.q, "EQ幅", 0.1, 18),
-      gain: readNumber(eq.gain, "EQゲイン", -24, 24)
+      bands: parseEqBands(eq)
     },
     delay: {
       enabled: readBoolean(delay.enabled, "ディレイ"),
@@ -161,6 +160,44 @@ function parseEffects(value: unknown): EffectConfiguration {
   const error = validateEffects(result);
   if (error) throw new Error(error);
   return result;
+}
+
+function parseEqBands(source: Record<string, unknown>): EffectConfiguration["eq"]["bands"] {
+  if (source.bands === undefined) {
+    return [
+      {
+        enabled: true,
+        type: "peaking",
+        frequency: readNumber(source.frequency, "EQ周波数", 20, 20_000),
+        q: readNumber(source.q, "EQ幅", 0.1, 18),
+        gain: readNumber(source.gain, "EQゲイン", -24, 24)
+      },
+      structuredClone(defaultEffects.eq.bands[1]),
+      structuredClone(defaultEffects.eq.bands[2])
+    ];
+  }
+  if (!Array.isArray(source.bands) || source.bands.length !== 3) {
+    throw new Error("EQには3つのバンド設定が必要です。");
+  }
+  return [
+    parseEqBand(source.bands[0], 1),
+    parseEqBand(source.bands[1], 2),
+    parseEqBand(source.bands[2], 3)
+  ];
+}
+
+function parseEqBand(value: unknown, index: number): EffectConfiguration["eq"]["bands"][number] {
+  const source = asRecord(value, `EQバンド${index}`);
+  if (typeof source.type !== "string" || !eqFilterTypes.includes(source.type as EqFilterType)) {
+    throw new Error(`EQバンド${index}のフィルター形式が正しくありません。`);
+  }
+  return {
+    enabled: readBoolean(source.enabled, `EQバンド${index}`),
+    type: source.type as EqFilterType,
+    frequency: readNumber(source.frequency, `EQバンド${index}周波数`, 20, 20_000),
+    q: readNumber(source.q, `EQバンド${index} Q`, 0.1, 18),
+    gain: readNumber(source.gain, `EQバンド${index}ゲイン`, -24, 24)
+  };
 }
 
 function parseRouting(value: unknown): RoutingEdge[] {
