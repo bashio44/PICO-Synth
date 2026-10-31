@@ -26,6 +26,7 @@ import {
 } from "./model/controls";
 import { pianoNoteForKey } from "./ui/keyboard";
 import { effectPreviewSvg, waveformPath } from "./ui/visualizations";
+import { samplePresets } from "./model/presets";
 
 const engine = new AudioEngine();
 const midiPlayer = new MidiPlayer(engine);
@@ -45,6 +46,12 @@ const waveformNames: Record<Waveform, string> = {
   noise: "ノイズ（ざらざら / Noise）"
 };
 const waveformValues: Waveform[] = ["sine", "square", "sawtooth", "triangle", "noise"];
+const presetOptions = samplePresets.map(([id, english, japanese]) =>
+  `<option value="${id}">${japanese} / ${english}</option>`
+).join("");
+const proPresetOptions = samplePresets.map(([id, english]) =>
+  `<option value="${id}">${english}</option>`
+).join("");
 
 function oscillatorCard(index: number): string {
   const oscillator = settings.oscillators[index];
@@ -63,6 +70,51 @@ function oscillatorCard(index: number): string {
       </div>
       <div class="range-row compact"><label for="cents-${index}"><span class="parameter-name">微調整 <span class="helper">セント</span></span><span class="parameter-term">Fine Tune</span></label><input id="cents-${index}" type="range" min="-100" max="100" step="1" value="${oscillator.cents}" data-osc="${index}" data-prop="cents" aria-label="オシレーター${index + 1}の微調整 (Fine Tune)"><output>${oscillator.cents}</output></div>
     </article>`;
+}
+
+function proKnob(label: string, proxy: string, min: number, max: number, step: number, value: number, unit: string): string {
+    const fraction = (value - min) / (max - min);
+    const angle = -135 + fraction * 270;
+    const display = unit === "%" ? `${Math.round(value * 100)}%` : `${value}${unit}`;
+    return `<label class="pro-control"><span class="pro-control-label">${label}</span><span class="pro-dial" style="--dial-angle:${angle}deg"><input type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-proxy="${proxy}" aria-label="${label}"><span class="pro-dial-face"></span></span><output>${display}</output></label>`;
+}
+
+function proToggle(label: string, proxy: string, checked: boolean): string {
+    return `<label class="pro-toggle"><input type="checkbox" data-proxy="${proxy}" ${checked ? "checked" : ""}><span class="pro-toggle-track"></span><span>${label}</span></label>`;
+}
+
+function proWaveSelect(index: 0 | 1): string {
+    return `<label class="pro-select"><span>WAVEFORM</span><select data-proxy="wave-${index}" aria-label="Oscillator ${index + 1} waveform">${waveformValues.map((wave) => `<option value="${wave}" ${settings.oscillators[index].waveform === wave ? "selected" : ""}>${wave.toUpperCase()}</option>`).join("")}</select></label>`;
+}
+
+function proOscillatorPanel(index: 0 | 1): string {
+    const oscillator = settings.oscillators[index];
+    return `<article class="pro-module pro-oscillator pro-osc-${index + 1}"><div class="pro-module-heading"><span class="pro-module-index">0${index + 1}</span><div><h3>OSCILLATOR ${index + 1}</h3><p>${index === 0 ? "PRIMARY VOICE" : "LAYER / MODULATOR"}</p></div><span class="pro-led"></span></div>${proWaveSelect(index)}<div class="pro-knob-row">${proKnob(index === 1 ? "MOD LEVEL" : "LEVEL", `volume-${index}`, 0, 1, 0.01, oscillator.volume, "%")}${proKnob("COARSE", `semitone-${index}`, -24, 24, 1, oscillator.semitones, " st")}${proKnob("FINE", `cents-${index}`, -100, 100, 1, oscillator.cents, " ct")}</div>${index === 1 ? `<div class="pro-inline-switch">${proToggle("USE OSC 2 AS FM MODULATOR", "fm-enabled", settings.fmEnabled)}${proKnob("FM INDEX", "fm-depth", 0, 1000, 1, settings.fmDepth, " Hz")}</div>` : ""}</article>`;
+}
+
+function proEnvelopePanel(index: 0 | 1): string {
+    const envelope = index === 0 ? settings.envelope : settings.envelope2;
+    const enabled = index === 0 || settings.envelope2Enabled;
+    const prefix = `envelope-${index}`;
+    return `<div class="pro-envelope ${enabled ? "" : "is-disabled"}" data-pro-envelope="${index}"><div class="pro-envelope-heading"><h4>OSC ${index + 1} ENVELOPE</h4>${index === 1 ? proToggle("SEPARATE ADSR", "envelope2-enabled", settings.envelope2Enabled) : "<span>SHARED BY DEFAULT</span>"}</div><div class="pro-knob-row pro-adsr-knobs">${(["attack", "decay", "sustain", "release"] as const).map((part) => {
+      const min = part === "sustain" ? 0 : 0.01;
+      const max = part === "sustain" ? 100 : 5;
+      const value = part === "sustain" ? envelope[part] * 100 : envelope[part];
+      return proKnob(part.toUpperCase(), `${prefix}-${part}`, min, max, 0.01, value, part === "sustain" ? "%" : " s");
+    }).join("")}</div></div>`;
+}
+
+function proLfoPanel(key: "pitchLfo" | "volumeLfo"): string {
+    const lfo = settings[key];
+    const pitch = key === "pitchLfo";
+    const target = pitch ? "pitch" : "amp";
+    return `<article class="pro-module pro-lfo"><div class="pro-module-heading"><span class="pro-module-index">LFO</span><div><h3>${pitch ? "PITCH MOD" : "AMP MOD"}</h3><p>${pitch ? "FREQUENCY MOVEMENT" : "VOLUME MOVEMENT"}</p></div>${proToggle("ON", `${key}-enabled`, lfo.enabled)}</div><label class="pro-select"><span>SHAPE</span><select data-proxy="${key}-wave" aria-label="${pitch ? "Pitch" : "Amplitude"} LFO waveform">${(["sine", "triangle", "square", "sawtooth"] as const).map((wave) => `<option value="${wave}" ${lfo.waveform === wave ? "selected" : ""}>${wave.toUpperCase()}</option>`).join("")}</select></label><div class="pro-knob-row">${proKnob("RATE", `${key}-freq-number`, 0.01, 2000, 0.01, lfo.frequency, " Hz")}${proKnob("DEPTH", `${key}-depth`, 0, pitch ? 200 : 0.5, pitch ? 1 : 0.01, lfo.depth, pitch ? " ct" : "")}</div><span class="pro-mod-target">TARGET · ${target}</span></article>`;
+}
+
+function proKeyboardMarkup(): string {
+    return `<div class="keyboard pro-keys" role="group" aria-label="One octave keyboard">${Array.from({ length: 13 }, (_, i) =>
+      `<button type="button" class="key ${[1, 3, 6, 8, 10].includes(i) ? "black-key" : "white-key"}" data-note="${60 + i}" aria-label="${["C", "C sharp", "D", "D sharp", "E", "F", "F sharp", "G", "G sharp", "A", "A sharp", "B", "C"][i]}"><span>${["C", "D", "E", "F", "G", "A", "B"][i] ?? ""}</span></button>`
+    ).join("")}</div>`;
 }
 
 function envelopeEditor(index: 0 | 1): string {
@@ -92,7 +144,7 @@ app.innerHTML = `
       </div>
       <div class="hero-art" aria-hidden="true"><div class="orb orb-one"></div><div class="orb orb-two"></div><div class="sound-card"><span class="sound-card-label">YOUR SOUND</span><div class="wave-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="sound-card-foot">♪  440 Hz</span></div><span class="float-note note-a">♪</span><span class="float-note note-b">✳</span></div>
     </section>
-    <nav class="tabs" aria-label="音づくりの画面"><button class="tab active" type="button" data-tab="synth" aria-current="page"><span aria-hidden="true">🎛️</span> 音づくり</button><button class="tab" type="button" data-tab="effects"><span aria-hidden="true">✨</span> エフェクト</button></nav>
+    <nav class="tabs" aria-label="音づくりの画面"><button class="tab active" type="button" data-tab="synth" aria-current="page"><span aria-hidden="true">🎛️</span> 音づくり</button><button class="tab" type="button" data-tab="effects"><span aria-hidden="true">✨</span> エフェクト</button><div class="mode-switch" role="group" aria-label="Editor mode"><button class="mode-button active" type="button" data-mode="studio" aria-pressed="true">はじめて</button><button class="mode-button" type="button" data-mode="pro" aria-pressed="false">PRO SYNTH</button></div></nav>
     <section id="synth-view" class="view-panel">
     <section class="workspace">
       <section class="panel card" aria-labelledby="osc-title">
@@ -145,6 +197,20 @@ app.innerHTML = `
       </section>
     </section>
     </section>
+    <section id="pro-view" class="view-panel pro-view" aria-label="Professional synthesizer editor" hidden>
+      <div class="pro-console">
+        <header class="pro-console-header"><div class="pro-brand"><span class="pro-brand-mark">P</span><div><strong>PICO SYNTH</strong><small>PRO SOUND DESIGNER</small></div></div><div class="pro-preset-control"><label for="pro-preset-select">PRESET</label><select id="pro-preset-select">${proPresetOptions}</select><button id="pro-preset-load" type="button">LOAD</button></div><button class="pro-fx-button" type="button" data-tab="effects">FX RACK <span aria-hidden="true">↗</span></button></header>
+        <div class="pro-status-strip"><span><i></i> VOICE ENGINE</span><span id="pro-voice-status">POLYPHONY · ${settings.polyphony} VOICES</span><span>WEB AUDIO / STEREO</span></div>
+        <div class="pro-modules">
+          ${proOscillatorPanel(0)}
+          ${proOscillatorPanel(1)}
+          <section class="pro-module pro-envelope-module"><div class="pro-module-heading"><span class="pro-module-index">ENV</span><div><h3>AMPLITUDE ENVELOPE</h3><p>SHAPE THE VOICE OVER TIME</p></div><span class="pro-envelope-shape">A — D — S — R</span></div>${proEnvelopePanel(0)}${proEnvelopePanel(1)}</section>
+          <section class="pro-lfo-bank"><div class="pro-section-heading"><div><p>MODULATION MATRIX</p><h3>Movement &amp; Expression</h3></div><span>LIVE CONTROL</span></div><div class="pro-lfo-grid">${proLfoPanel("pitchLfo")}${proLfoPanel("volumeLfo")}</div></section>
+          <section class="pro-keyboard-module"><div class="pro-section-heading"><div><p>PERFORMANCE</p><h3>Play the instrument</h3></div><span>CLICK · TOUCH · A W S E D F T G Y H U J K</span></div>${proKeyboardMarkup()}</section>
+        </div>
+        <footer class="pro-console-footer"><span>PICO SYNTH PRO</span><span>ALL CONTROLS ARE LINKED TO THE STUDIO EDITOR</span><button type="button" data-mode="studio">BACK TO STUDIO</button></footer>
+      </div>
+    </section>
     <section id="effects-view" class="view-panel" hidden>
       <section class="panel card" aria-labelledby="effects-title">
         <div class="panel-heading"><div><p class="eyebrow">COLOR YOUR SOUND</p><h2 id="effects-title">エフェクトで音をかざろう</h2></div><span class="step-badge badge-pink">05 · EFFECTS</span></div>
@@ -167,7 +233,7 @@ app.innerHTML = `
       <section class="panel card settings-panel" aria-labelledby="settings-title">
         <div class="panel-heading"><div><p class="eyebrow">KEEP YOUR SOUND</p><h2 id="settings-title">設定をテキストで保存</h2></div><span class="step-badge badge-yellow">JSON · v1</span></div>
         <p class="panel-copy">音色・エフェクト・配線・読み込んだMIDIノートを、あとで戻せるテキストにします。</p>
-        <div class="preset-actions"><label for="preset-select">サンプル音色 <span class="parameter-term">プリセットを試す</span></label><select id="preset-select"><option value="piano">ピアノ / Piano</option><option value="trumpet">トランペット / Trumpet</option><option value="violin">バイオリン / Violin</option></select><button type="button" class="file-button" id="preset-load">音色を読み込む</button><p class="settings-status" id="preset-status" aria-live="polite"></p></div>
+        <div class="preset-actions"><label for="preset-select">サンプル音色 <span class="parameter-term">プリセットを試す</span></label><select id="preset-select">${presetOptions}</select><button type="button" class="file-button" id="preset-load">音色を読み込む</button><p class="settings-status" id="preset-status" aria-live="polite"></p></div>
         <div class="settings-actions"><button type="button" class="file-button" id="settings-export">↓ 設定を書き出す</button><button type="button" class="midi-action secondary" id="settings-import">↑ このテキストを読み込む</button></div>
         <label class="visually-hidden" for="settings-json">設定JSONテキスト</label>
         <textarea id="settings-json" spellcheck="false" aria-describedby="settings-status" placeholder="「設定を書き出す」を押すと、ここにJSONが表示されます。"></textarea>
@@ -376,7 +442,7 @@ function startNote(note: number): void {
     return;
   }
   activeNotes.set(note, voice);
-  document.querySelector<HTMLButtonElement>(`.key[data-note="${note}"]`)?.classList.add("pressed");
+  document.querySelectorAll<HTMLButtonElement>(`.key[data-note="${note}"]`).forEach((key) => key.classList.add("pressed"));
   keyHint.textContent = `${noteName(note)} の音が鳴っています`;
 }
 
@@ -385,7 +451,7 @@ function stopNote(note: number): void {
   if (voice === undefined) return;
   engine.noteOff(voice);
   activeNotes.delete(note);
-  document.querySelector<HTMLButtonElement>(`.key[data-note="${note}"]`)?.classList.remove("pressed");
+  document.querySelectorAll<HTMLButtonElement>(`.key[data-note="${note}"]`).forEach((key) => key.classList.remove("pressed"));
 }
 
 function releaseKeyboardNotes(): void {
@@ -448,17 +514,43 @@ function rebuildEffectsGraph(): boolean {
   }
 }
 
+let editorMode: "studio" | "pro" = "studio";
+
+function updateEditorView(tab: "synth" | "effects" = "synth"): void {
+  const inProMode = editorMode === "pro" && tab === "synth";
+  document.querySelector<HTMLElement>("#synth-view")!.hidden = tab !== "synth" || inProMode;
+  document.querySelector<HTMLElement>("#pro-view")!.hidden = !inProMode;
+  document.querySelector<HTMLElement>("#effects-view")!.hidden = tab !== "effects";
+  document.querySelector<HTMLElement>(".shell")!.classList.toggle("pro-mode", inProMode);
+  document.querySelector<HTMLElement>(".shell")!.classList.toggle("effects-open", tab === "effects");
+  document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((button) => {
+    const active = button.dataset.tab === tab && button.closest(".tabs");
+    button.classList.toggle("active", Boolean(active));
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
+  document.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((button) => {
+    const active = button.dataset.mode === editorMode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  const studioButton = document.querySelector<HTMLButtonElement>('.mode-button[data-mode="studio"]');
+  if (studioButton) studioButton.textContent = inProMode ? "STUDIO" : "はじめて";
+  const effectsTab = document.querySelector<HTMLButtonElement>('.tabs [data-tab="effects"]');
+  if (effectsTab) effectsTab.innerHTML = inProMode ? "FX RACK" : '<span aria-hidden="true">✨</span> エフェクト';
+}
+
+document.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((button) => {
+  button.addEventListener("click", () => {
+    editorMode = button.dataset.mode === "pro" ? "pro" : "studio";
+    updateEditorView();
+    syncProControls();
+  });
+});
+
 document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((tab) => {
   tab.addEventListener("click", () => {
-    const view = tab.dataset.tab;
-    document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((other) => {
-      const active = other === tab;
-      other.classList.toggle("active", active);
-      if (active) other.setAttribute("aria-current", "page");
-      else other.removeAttribute("aria-current");
-    });
-    document.querySelector<HTMLElement>("#synth-view")!.hidden = view !== "synth";
-    document.querySelector<HTMLElement>("#effects-view")!.hidden = view !== "effects";
+    updateEditorView(tab.dataset.tab === "effects" ? "effects" : "synth");
   });
 });
 
@@ -555,7 +647,104 @@ function syncSettingsToUI(): void {
   drawEnvelope(0);
   drawEnvelope(1);
   drawRouting();
+  syncProControls();
 }
+
+function syncProControls(): void {
+  document.querySelectorAll<HTMLInputElement | HTMLSelectElement>(".pro-console [data-proxy]").forEach((control) => {
+    const proxy = control.dataset.proxy;
+    const source = proxy ? document.getElementById(proxy) : null;
+    if (!(source instanceof HTMLInputElement || source instanceof HTMLSelectElement)) return;
+    if (control instanceof HTMLInputElement && control.type === "checkbox" && source instanceof HTMLInputElement) {
+      control.checked = source.checked;
+    } else {
+      control.value = source.value;
+    }
+    control.disabled = source.disabled;
+    const envelopeDisabled = proxy?.startsWith("envelope-1-") && !settings.envelope2Enabled;
+    if (envelopeDisabled) control.disabled = true;
+    if (control instanceof HTMLInputElement && control.type === "range") {
+      const dial = control.closest<HTMLElement>(".pro-dial");
+      const min = Number(control.min);
+      const max = Number(control.max);
+      const fraction = (Number(control.value) - min) / (max - min);
+      if (dial) dial.style.setProperty("--dial-angle", `${-135 + fraction * 270}deg`);
+      const output = control.closest(".pro-control")?.querySelector("output");
+      if (output) {
+        const value = Number(control.value);
+        const formatted = Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
+        output.value = proxy?.startsWith("volume-") ? `${Math.round(value * 100)}%` :
+          proxy?.startsWith("semitone-") ? `${formatted} st` :
+          proxy?.startsWith("cents-") ? `${formatted} ct` :
+          proxy === "fm-depth" || proxy?.endsWith("-freq-number") ? `${formatted} Hz` :
+          proxy?.endsWith("-sustain") ? `${formatted}%` :
+          proxy?.startsWith("envelope-") ? `${formatted} s` :
+          proxy === "pitchLfo-depth" ? `${formatted} ct` : formatted;
+      }
+    }
+  });
+  document.querySelectorAll<HTMLElement>("[data-pro-envelope]").forEach((panel) => {
+    panel.classList.toggle("is-disabled", panel.dataset.proEnvelope === "1" && !settings.envelope2Enabled);
+  });
+  const modulationLabel = document.querySelector<HTMLElement>(".pro-osc-2 .pro-control-label");
+  if (modulationLabel) modulationLabel.textContent = "MOD LEVEL";
+  const voiceStatus = document.querySelector<HTMLElement>("#pro-voice-status");
+  if (voiceStatus) voiceStatus.textContent = `POLYPHONY · ${settings.polyphony} VOICES`;
+}
+
+document.querySelectorAll<HTMLInputElement | HTMLSelectElement>(".pro-console [data-proxy]").forEach((control) => {
+  const updateSource = (event: Event) => {
+    const source = document.getElementById(control.dataset.proxy ?? "");
+    if (!(source instanceof HTMLInputElement || source instanceof HTMLSelectElement)) return;
+    if (control instanceof HTMLInputElement && control.type === "checkbox" && source instanceof HTMLInputElement) {
+      source.checked = control.checked;
+    } else {
+      source.value = control.value;
+    }
+    source.dispatchEvent(new Event(event.type, { bubbles: true }));
+  };
+  control.addEventListener("input", updateSource);
+  control.addEventListener("change", updateSource);
+});
+
+document.querySelectorAll<HTMLInputElement>(".pro-dial input").forEach((dial) => {
+  let pointerId: number | null = null;
+  const setFromPointer = (event: PointerEvent) => {
+    const bounds = dial.getBoundingClientRect();
+    const angle = (Math.atan2(event.clientY - bounds.top - bounds.height / 2, event.clientX - bounds.left - bounds.width / 2) * 180 / Math.PI + 360) % 360;
+    const arcAngle = angle < 135 ? angle + 360 : angle;
+    const fraction = clamp((arcAngle - 135) / 270, 0, 1);
+    const min = Number(dial.min);
+    const max = Number(dial.max);
+    const step = Number(dial.step) || 1;
+    const next = min + Math.round((fraction * (max - min)) / step) * step;
+    dial.value = String(clamp(next, min, max));
+    dial.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  dial.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    pointerId = event.pointerId;
+    dial.setPointerCapture(event.pointerId);
+    setFromPointer(event);
+  });
+  dial.addEventListener("pointermove", (event) => {
+    if (event.pointerId === pointerId) setFromPointer(event);
+  });
+  dial.addEventListener("pointerup", (event) => {
+    if (event.pointerId !== pointerId) return;
+    pointerId = null;
+    dial.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  dial.addEventListener("pointercancel", () => { pointerId = null; });
+});
+
+document.addEventListener("input", (event) => {
+  if (event.target instanceof HTMLElement && !event.target.closest(".pro-console")) syncProControls();
+});
+document.addEventListener("change", (event) => {
+  if (event.target instanceof HTMLElement && !event.target.closest(".pro-console")) syncProControls();
+});
+syncProControls();
 
 document.querySelector<HTMLButtonElement>("#settings-export")!.addEventListener("click", () => {
   const textarea = document.querySelector<HTMLTextAreaElement>("#settings-json")!;
@@ -622,6 +811,22 @@ const midiStopButton = document.querySelector<HTMLButtonElement>("#midi-stop")!;
 const midiProgress = document.querySelector<HTMLProgressElement>("#midi-progress")!;
 
 const presetLoadButton = document.querySelector<HTMLButtonElement>("#preset-load")!;
+presetLoadButton.addEventListener("click", () => {
+  document.querySelector<HTMLSelectElement>("#pro-preset-select")!.value =
+    document.querySelector<HTMLSelectElement>("#preset-select")!.value;
+});
+document.querySelector<HTMLSelectElement>("#pro-preset-select")!.addEventListener("change", (event) => {
+  document.querySelector<HTMLSelectElement>("#preset-select")!.value = (event.currentTarget as HTMLSelectElement).value;
+});
+document.querySelector<HTMLButtonElement>("#pro-preset-load")!.addEventListener("click", () => {
+  document.querySelector<HTMLSelectElement>("#preset-select")!.value =
+    document.querySelector<HTMLSelectElement>("#pro-preset-select")!.value;
+  presetLoadButton.click();
+});
+document.querySelector<HTMLSelectElement>("#preset-select")!.addEventListener("change", () => {
+  document.querySelector<HTMLSelectElement>("#pro-preset-select")!.value =
+    document.querySelector<HTMLSelectElement>("#preset-select")!.value;
+});
 presetLoadButton.addEventListener("click", async () => {
   const presetName = document.querySelector<HTMLSelectElement>("#preset-select")!.value;
   const status = document.querySelector<HTMLParagraphElement>("#preset-status")!;

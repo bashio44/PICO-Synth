@@ -1,0 +1,22 @@
+export const samplePresets = [
+  ["piano", "Piano", "ピアノ"],
+  ["trumpet", "Trumpet", "トランペット"],
+  ["violin", "Violin", "バイオリン"],
+  ["marimba", "Marimba", "マリンバ"],
+  ["electric-piano", "Electric Piano", "エレクトリックピアノ"],
+  ["organ", "Organ", "オルガン"],
+  ["celesta", "Celesta", "チェレスタ"],
+  ["bell", "Glass Bell", "ベル"],
+  ["pluck", "Pluck", "プラック"],
+  ["bass", "Finger Bass", "ベース"],
+  ["synth-bass", "Synth Bass", "シンセベース"],
+  ["lead", "Analog Lead", "リード"],
+  ["pad", "Warm Pad", "パッド"],
+  ["strings", "Ensemble Strings", "ストリングス"],
+  ["brass", "Brass Section", "ブラス"],
+  ["flute", "Flute", "フルート"],
+  ["clarinet", "Clarinet", "クラリネット"],
+  ["choir", "Choir", "コーラス"],
+  ["arp", "Dream Arpeggio", "アルペジオ"],
+  ["fm-bell", "FM Bell", "FMベル"]
+] as const;

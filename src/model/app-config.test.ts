@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createDefaultAppSettings, parseAppSettings, stringifyAppSettings } from "./app-config";
 import { defaultRouting } from "./effects";
+import { samplePresets } from "./presets";
 
 describe("PICO settings JSON", () => {
   it("round-trips the synth, effects, routes, and MIDI note data", () => {
@@ -82,5 +83,11 @@ describe("PICO settings JSON", () => {
       notes: [{ pitch: 60, velocity: 100, start: 0.9, duration: 0.5, track: "Lead" }]
     };
     expect(() => parseAppSettings(JSON.stringify(settings))).toThrow(/曲の長さ/);
+  });
+
+  it("lists twenty unique sample preset files", () => {
+    const presetIds = samplePresets.map(([id]) => id);
+    expect(presetIds).toHaveLength(20);
+    expect(new Set(presetIds).size).toBe(presetIds.length);
   });
 });
