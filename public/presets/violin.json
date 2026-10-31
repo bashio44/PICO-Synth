@@ -2,34 +2,118 @@
   "version": 1,
   "synth": {
     "oscillators": [
-      { "waveform": "sawtooth", "volume": 0.46, "semitones": 0, "cents": 0 },
-      { "waveform": "triangle", "volume": 0.35, "semitones": 0, "cents": 5 }
+      {
+        "waveform": "sawtooth",
+        "volume": 0.386,
+        "semitones": 0,
+        "cents": 0
+      },
+      {
+        "waveform": "triangle",
+        "volume": 0.294,
+        "semitones": 0,
+        "cents": 5
+      }
     ],
-    "envelope": { "attack": 0.24, "decay": 0.12, "sustain": 0.86, "release": 0.42 },
-    "envelope2": { "attack": 0.3, "decay": 0.16, "sustain": 0.8, "release": 0.48 },
+    "envelope": {
+      "attack": 0.24,
+      "decay": 0.12,
+      "sustain": 0.86,
+      "release": 0.42
+    },
+    "envelope2": {
+      "attack": 0.3,
+      "decay": 0.16,
+      "sustain": 0.8,
+      "release": 0.48
+    },
     "envelope2Enabled": true,
     "fmEnabled": false,
     "fmDepth": 100,
-    "pitchLfo": { "enabled": true, "waveform": "sine", "frequency": 5.2, "depth": 5 },
-    "volumeLfo": { "enabled": false, "waveform": "sine", "frequency": 4, "depth": 0.25 },
+    "pitchLfo": {
+      "enabled": true,
+      "waveform": "sine",
+      "frequency": 5.2,
+      "depth": 5
+    },
+    "volumeLfo": {
+      "enabled": false,
+      "waveform": "sine",
+      "frequency": 4,
+      "depth": 0.25
+    },
     "polyphony": 8
   },
   "effects": {
-    "distortion": { "enabled": false, "wet": 0.35, "drive": 28, "tone": 12000 },
-    "chorus": { "enabled": true, "wet": 0.2, "rate": 0.55, "depth": 0.009 },
-    "compressor": { "enabled": false, "threshold": -24, "ratio": 4, "knee": 30, "attack": 0.003, "release": 0.25 },
-    "eq": { "enabled": false, "wet": 1, "frequency": 1200, "q": 0.8, "gain": 0 },
-    "delay": { "enabled": false, "wet": 0.25, "time": 0.28, "feedback": 0.32 },
-    "reverb": { "enabled": true, "wet": 0.32, "decay": 2.8, "preDelay": 0.026 }
+    "distortion": {
+      "enabled": false,
+      "wet": 0.35,
+      "drive": 28,
+      "tone": 12000
+    },
+    "chorus": {
+      "enabled": true,
+      "wet": 0.2,
+      "rate": 0.55,
+      "depth": 0.009
+    },
+    "compressor": {
+      "enabled": false,
+      "threshold": -24,
+      "ratio": 4,
+      "knee": 30,
+      "attack": 0.003,
+      "release": 0.25
+    },
+    "eq": {
+      "enabled": false,
+      "wet": 1,
+      "frequency": 1200,
+      "q": 0.8,
+      "gain": 0
+    },
+    "delay": {
+      "enabled": false,
+      "wet": 0.25,
+      "time": 0.28,
+      "feedback": 0.32
+    },
+    "reverb": {
+      "enabled": true,
+      "wet": 0.32,
+      "decay": 2.8,
+      "preDelay": 0.026
+    }
   },
   "routing": [
-    { "from": "input", "to": "distortion" },
-    { "from": "distortion", "to": "chorus" },
-    { "from": "chorus", "to": "compressor" },
-    { "from": "compressor", "to": "eq" },
-    { "from": "eq", "to": "delay" },
-    { "from": "delay", "to": "reverb" },
-    { "from": "reverb", "to": "output" }
+    {
+      "from": "input",
+      "to": "distortion"
+    },
+    {
+      "from": "distortion",
+      "to": "chorus"
+    },
+    {
+      "from": "chorus",
+      "to": "compressor"
+    },
+    {
+      "from": "compressor",
+      "to": "eq"
+    },
+    {
+      "from": "eq",
+      "to": "delay"
+    },
+    {
+      "from": "delay",
+      "to": "reverb"
+    },
+    {
+      "from": "reverb",
+      "to": "output"
+    }
   ],
   "midi": null
 }

@@ -1,7 +1,9 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { createDefaultAppSettings, parseAppSettings, stringifyAppSettings } from "./app-config";
 import { defaultRouting } from "./effects";
-import { samplePresets } from "./presets";
+import { parseMidiFile } from "../midi/parser";
+import { midiSamples, samplePresets } from "./presets";
 
 describe("PICO settings JSON", () => {
   it("round-trips the synth, effects, routes, and MIDI note data", () => {
@@ -41,6 +43,17 @@ describe("PICO settings JSON", () => {
     expect(parseAppSettings(stringifyAppSettings(settings)).synth.volumeLfo.frequency).toBe(440);
     settings.synth.pitchLfo.frequency = 0.0137;
     expect(parseAppSettings(stringifyAppSettings(settings)).synth.pitchLfo.frequency).toBe(0.0137);
+  });
+
+  it("supports fine ADSR times and wider oscillator tuning", () => {
+    const settings = createDefaultAppSettings();
+    settings.synth.envelope.attack = 0.001;
+    settings.synth.oscillators[0].semitones = 36;
+    const restored = parseAppSettings(stringifyAppSettings(settings)).synth;
+    expect(restored.envelope.attack).toBe(0.001);
+    expect(restored.oscillators[0].semitones).toBe(36);
+    settings.synth.oscillators[0].semitones = 49;
+    expect(() => parseAppSettings(stringifyAppSettings(settings))).toThrow(/音程/);
   });
 
   it("loads earlier v1 files with shared ADSR and default values for newer effect controls", () => {
@@ -85,9 +98,31 @@ describe("PICO settings JSON", () => {
     expect(() => parseAppSettings(JSON.stringify(settings))).toThrow(/曲の長さ/);
   });
 
-  it("lists twenty unique sample preset files", () => {
+  it("lists thirty unique sound presets and five unique MIDI performances", () => {
     const presetIds = samplePresets.map(([id]) => id);
-    expect(presetIds).toHaveLength(20);
+    expect(presetIds).toHaveLength(30);
     expect(new Set(presetIds).size).toBe(presetIds.length);
+    expect(presetIds[0]).toBe("sine");
+    const midiIds = midiSamples.map(([id]) => id);
+    expect(midiIds).toHaveLength(5);
+    expect(new Set(midiIds).size).toBe(midiIds.length);
+  });
+
+  it("parses every bundled sound preset", async () => {
+    await Promise.all(samplePresets.map(async ([id]) => {
+      const file = await readFile(new URL(`../../public/presets/${id}.json`, import.meta.url), "utf8");
+      const parsed = parseAppSettings(file);
+      expect(parsed.synth.oscillators).toHaveLength(2);
+    }));
+  });
+
+  it("parses all five bundled MIDI samples into playable notes", async () => {
+    await Promise.all(midiSamples.map(async ([id]) => {
+      const file = await readFile(new URL(`../../public/midi/${id}.mid`, import.meta.url));
+      const data = new Uint8Array(file).buffer;
+      const clip = parseMidiFile(data, `${id}.mid`);
+      expect(clip.notes.length).toBeGreaterThan(0);
+      expect(clip.duration).toBeGreaterThan(0);
+    }));
   });
 });

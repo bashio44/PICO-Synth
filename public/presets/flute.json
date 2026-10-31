@@ -1,1 +1,119 @@
-{"version":1,"synth":{"oscillators":[{"waveform":"sine","volume":0.57,"semitones":0,"cents":0},{"waveform":"triangle","volume":0.1,"semitones":12,"cents":0}],"envelope":{"attack":0.16,"decay":0.18,"sustain":0.74,"release":0.32},"envelope2":{"attack":0.18,"decay":0.2,"sustain":0.7,"release":0.34},"envelope2Enabled":false,"fmEnabled":false,"fmDepth":100,"pitchLfo":{"enabled":false,"waveform":"sine","frequency":5,"depth":35},"volumeLfo":{"enabled":false,"waveform":"sine","frequency":4,"depth":0.25},"polyphony":8},"effects":{"distortion":{"enabled":false,"wet":0.2,"drive":10,"tone":10000},"chorus":{"enabled":false,"wet":0.2,"rate":0.8,"depth":0.012},"compressor":{"enabled":false,"threshold":-24,"ratio":3,"knee":24,"attack":0.01,"release":0.2},"eq":{"enabled":false,"wet":1,"frequency":1200,"q":0.8,"gain":0},"delay":{"enabled":false,"wet":0.15,"time":0.28,"feedback":0.2},"reverb":{"enabled":true,"wet":0.2,"decay":1.8,"preDelay":0.025}},"routing":[{"from":"input","to":"distortion"},{"from":"distortion","to":"chorus"},{"from":"chorus","to":"compressor"},{"from":"compressor","to":"eq"},{"from":"eq","to":"delay"},{"from":"delay","to":"reverb"},{"from":"reverb","to":"output"}],"midi":null}
+{
+  "version": 1,
+  "synth": {
+    "oscillators": [
+      {
+        "waveform": "sine",
+        "volume": 0.579,
+        "semitones": 0,
+        "cents": 0
+      },
+      {
+        "waveform": "triangle",
+        "volume": 0.101,
+        "semitones": 12,
+        "cents": 0
+      }
+    ],
+    "envelope": {
+      "attack": 0.16,
+      "decay": 0.18,
+      "sustain": 0.74,
+      "release": 0.32
+    },
+    "envelope2": {
+      "attack": 0.18,
+      "decay": 0.2,
+      "sustain": 0.7,
+      "release": 0.34
+    },
+    "envelope2Enabled": false,
+    "fmEnabled": false,
+    "fmDepth": 100,
+    "pitchLfo": {
+      "enabled": false,
+      "waveform": "sine",
+      "frequency": 5,
+      "depth": 35
+    },
+    "volumeLfo": {
+      "enabled": false,
+      "waveform": "sine",
+      "frequency": 4,
+      "depth": 0.25
+    },
+    "polyphony": 8
+  },
+  "effects": {
+    "distortion": {
+      "enabled": false,
+      "wet": 0.2,
+      "drive": 10,
+      "tone": 10000
+    },
+    "chorus": {
+      "enabled": false,
+      "wet": 0.2,
+      "rate": 0.8,
+      "depth": 0.012
+    },
+    "compressor": {
+      "enabled": false,
+      "threshold": -24,
+      "ratio": 3,
+      "knee": 24,
+      "attack": 0.01,
+      "release": 0.2
+    },
+    "eq": {
+      "enabled": false,
+      "wet": 1,
+      "frequency": 1200,
+      "q": 0.8,
+      "gain": 0
+    },
+    "delay": {
+      "enabled": false,
+      "wet": 0.15,
+      "time": 0.28,
+      "feedback": 0.2
+    },
+    "reverb": {
+      "enabled": true,
+      "wet": 0.2,
+      "decay": 1.8,
+      "preDelay": 0.025
+    }
+  },
+  "routing": [
+    {
+      "from": "input",
+      "to": "distortion"
+    },
+    {
+      "from": "distortion",
+      "to": "chorus"
+    },
+    {
+      "from": "chorus",
+      "to": "compressor"
+    },
+    {
+      "from": "compressor",
+      "to": "eq"
+    },
+    {
+      "from": "eq",
+      "to": "delay"
+    },
+    {
+      "from": "delay",
+      "to": "reverb"
+    },
+    {
+      "from": "reverb",
+      "to": "output"
+    }
+  ],
+  "midi": null
+}

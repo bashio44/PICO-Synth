@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "synth": {
+    "oscillators": [
+      {
+        "waveform": "sine",
+        "volume": 0.68,
+        "semitones": 0,
+        "cents": 0
+      },
+      {
+        "waveform": "sine",
+        "volume": 0,
+        "semitones": 0,
+        "cents": 0
+      }
+    ],
+    "envelope": {
+      "attack": 0.01,
+      "decay": 0.01,
+      "sustain": 1,
+      "release": 0.18
+    },
+    "envelope2": {
+      "attack": 0.01,
+      "decay": 0.01,
+      "sustain": 1,
+      "release": 0.18
+    },
+    "envelope2Enabled": false,
+    "fmEnabled": false,
+    "fmDepth": 100,
+    "pitchLfo": {
+      "enabled": false,
+      "waveform": "sine",
+      "frequency": 5,
+      "depth": 4
+    },
+    "volumeLfo": {
+      "enabled": false,
+      "waveform": "sine",
+      "frequency": 4,
+      "depth": 0.25
+    },
+    "polyphony": 8
+  },
+  "effects": {
+    "distortion": {
+      "enabled": false,
+      "wet": 0,
+      "drive": 28,
+      "tone": 12000
+    },
+    "chorus": {
+      "enabled": false,
+      "wet": 0,
+      "rate": 0.8,
+      "depth": 0.012
+    },
+    "compressor": {
+      "enabled": false,
+      "threshold": -24,
+      "ratio": 4,
+      "knee": 30,
+      "attack": 0.003,
+      "release": 0.25
+    },
+    "eq": {
+      "enabled": false,
+      "wet": 1,
+      "frequency": 1200,
+      "q": 0.8,
+      "gain": 0
+    },
+    "delay": {
+      "enabled": false,
+      "wet": 0,
+      "time": 0.28,
+      "feedback": 0.32
+    },
+    "reverb": {
+      "enabled": false,
+      "wet": 0,
+      "decay": 1.6,
+      "preDelay": 0.012
+    }
+  },
+  "routing": [
+    {
+      "from": "input",
+      "to": "distortion"
+    },
+    {
+      "from": "distortion",
+      "to": "chorus"
+    },
+    {
+      "from": "chorus",
+      "to": "compressor"
+    },
+    {
+      "from": "compressor",
+      "to": "eq"
+    },
+    {
+      "from": "eq",
+      "to": "delay"
+    },
+    {
+      "from": "delay",
+      "to": "reverb"
+    },
+    {
+      "from": "reverb",
+      "to": "output"
+    }
+  ],
+  "midi": null
+}

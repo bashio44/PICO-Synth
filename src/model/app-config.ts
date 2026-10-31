@@ -46,19 +46,19 @@ export function parseAppSettings(text: string): AppSettings {
   ];
   const sourceEnvelope = asRecord(sourceSynth.envelope, "ADSR");
   const envelope = {
-    attack: readNumber(sourceEnvelope.attack, "ADSR attack", 0.01, 5),
-    decay: readNumber(sourceEnvelope.decay, "ADSR decay", 0.01, 5),
+    attack: readNumber(sourceEnvelope.attack, "ADSR attack", 0.001, 5),
+    decay: readNumber(sourceEnvelope.decay, "ADSR decay", 0.001, 5),
     sustain: readNumber(sourceEnvelope.sustain, "ADSR sustain", 0, 1),
-    release: readNumber(sourceEnvelope.release, "ADSR release", 0.01, 5)
+    release: readNumber(sourceEnvelope.release, "ADSR release", 0.001, 5)
   };
   const sourceEnvelope2 = sourceSynth.envelope2 === undefined
     ? envelope
     : asRecord(sourceSynth.envelope2, "OSC 2 ADSR");
   const envelope2 = sourceSynth.envelope2 === undefined ? { ...envelope } : {
-    attack: readNumber(sourceEnvelope2.attack, "OSC 2 ADSR attack", 0.01, 5),
-    decay: readNumber(sourceEnvelope2.decay, "OSC 2 ADSR decay", 0.01, 5),
+    attack: readNumber(sourceEnvelope2.attack, "OSC 2 ADSR attack", 0.001, 5),
+    decay: readNumber(sourceEnvelope2.decay, "OSC 2 ADSR decay", 0.001, 5),
     sustain: readNumber(sourceEnvelope2.sustain, "OSC 2 ADSR sustain", 0, 1),
-    release: readNumber(sourceEnvelope2.release, "OSC 2 ADSR release", 0.01, 5)
+    release: readNumber(sourceEnvelope2.release, "OSC 2 ADSR release", 0.001, 5)
   };
   const synth: SynthSettings = {
     oscillators,
@@ -89,7 +89,7 @@ function parseOscillator(value: unknown, label: string): OscillatorSettings {
   return {
     waveform: source.waveform as Waveform,
     volume: readNumber(source.volume, `${label} 音量`, 0, 1),
-    semitones: readInteger(source.semitones, `${label} 音程`, -24, 24),
+    semitones: readInteger(source.semitones, `${label} 音程`, -48, 48),
     cents: readNumber(source.cents, `${label} 微調整`, -100, 100)
   };
 }

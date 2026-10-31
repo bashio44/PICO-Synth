@@ -1,4 +1,5 @@
 export const samplePresets = [
+  ["sine", "Pure Sine", "サイン波"],
   ["piano", "Piano", "ピアノ"],
   ["trumpet", "Trumpet", "トランペット"],
   ["violin", "Violin", "バイオリン"],
@@ -18,5 +19,22 @@ export const samplePresets = [
   ["clarinet", "Clarinet", "クラリネット"],
   ["choir", "Choir", "コーラス"],
   ["arp", "Dream Arpeggio", "アルペジオ"],
-  ["fm-bell", "FM Bell", "FMベル"]
+  ["fm-bell", "FM Bell", "FMベル"],
+  ["kick", "Deep Kick", "キック"],
+  ["808-kick", "808 Kick", "808キック"],
+  ["snare", "Studio Snare", "スネア"],
+  ["clap", "Hand Clap", "クラップ"],
+  ["closed-hat", "Closed Hi-Hat", "クローズハイハット"],
+  ["open-hat", "Open Hi-Hat", "オープンハイハット"],
+  ["low-tom", "Low Tom", "ロータム"],
+  ["cymbal", "Crash Cymbal", "クラッシュシンバル"],
+  ["rimshot", "Rim Shot", "リムショット"]
+] as const;
+
+export const midiSamples = [
+  ["scale-run", "Scale Run", "メジャースケール"],
+  ["moonlit-arp", "Moonlit Arpeggio", "月夜のアルペジオ"],
+  ["blues-step", "Blues Step", "ブルース"],
+  ["drum-groove", "Pocket Drum Groove", "ドラムグルーヴ"],
+  ["waltz", "Little Waltz", "小さなワルツ"]
 ] as const;

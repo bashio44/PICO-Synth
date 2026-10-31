@@ -3,13 +3,13 @@ import { clamp } from "./config";
 export type EnvelopeControl = "attack" | "decay" | "sustain" | "release";
 
 export function normalizeEnvelopeControl(control: EnvelopeControl, value: number): number {
-  if (!Number.isFinite(value)) return control === "sustain" ? 0 : 0.01;
+  if (!Number.isFinite(value)) return control === "sustain" ? 0 : 0.001;
   if (control === "sustain") return clamp(Math.round(clamp(value, 0, 100) * 100) / 10_000, 0, 1);
-  return clamp(Math.round(value * 100) / 100, 0.01, 5);
+  return clamp(Math.round(value * 1_000) / 1_000, 0.001, 5);
 }
 
 export function formatEnvelopeControl(control: EnvelopeControl, value: number): string {
-  return (control === "sustain" ? value * 100 : value).toFixed(2);
+  return (control === "sustain" ? value * 100 : value).toFixed(control === "sustain" ? 2 : 3);
 }
 
 const LFO_MIN_FREQUENCY = 0.01;

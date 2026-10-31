@@ -399,6 +399,27 @@ h2 { font-size: 19px; line-height: 1.35; }
 .pro-adsr-knobs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .pro-envelope.is-disabled { opacity: .43; }
 .pro-envelope.is-disabled .pro-adsr-knobs { pointer-events: none; }
+.pro-envelope { min-width: 0; padding-block: 7px 2px; }
+.pro-envelope-heading { margin-bottom: 6px; }
+.pro-envelope-heading h4, .pro-envelope-heading > span { font-size: 6px; }
+.pro-adsr-knobs { gap: 3px; }
+.pro-envelope .pro-control-label { font-size: 6px; }
+.pro-envelope .pro-dial { width: 34px; height: 34px; }
+.pro-envelope .pro-dial input { inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px); }
+.pro-envelope .pro-dial::after { top: 3px; height: 6px; transform-origin: 1px 14px; }
+.pro-envelope .pro-dial-face { width: 7px; height: 7px; }
+.pro-envelope .pro-control output { font-size: 7px; }
+.pro-envelope { min-width: 0; padding-block: 7px 2px; }
+.pro-envelope-heading { margin-bottom: 6px; }
+.pro-envelope-heading h4 { font-size: 7px; }
+.pro-envelope-heading > span { font-size: 6px; }
+.pro-adsr-knobs { gap: 3px; }
+.pro-envelope .pro-control-label { font-size: 6px; }
+.pro-envelope .pro-dial { width: 34px; height: 34px; }
+.pro-envelope .pro-dial input { inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px); }
+.pro-envelope .pro-dial::after { top: 3px; height: 6px; transform-origin: 1px 14px; }
+.pro-envelope .pro-dial-face { width: 7px; height: 7px; }
+.pro-envelope .pro-control output { font-size: 7px; }
 .pro-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
 .pro-section-heading h3 { font-size: 15px; letter-spacing: .2px; }
 .pro-section-heading > span { color: #8d89a4; font-size: 8px; font-weight: 700; letter-spacing: .7px; text-align: right; }
@@ -444,4 +465,151 @@ h2 { font-size: 19px; line-height: 1.35; }
   .pro-keyboard { height: 110px; }
   .pro-console-footer { flex-wrap: wrap; padding-inline: 12px; }
   .pro-console-footer > span:nth-child(2) { order: 3; flex-basis: 100%; margin: 0; text-align: left; }
+}
+
+.black-key { width: 4.35%; }
+.key-shortcuts { align-items: center; }
+.key-shortcuts > span:not(:first-child) { margin-left: 8px; }
+.midi-controls > label:not(.file-button) { color: #716d82; font-size: 10px; font-weight: 700; }
+.midi-controls > select { max-width: min(100%, 240px); min-height: 36px; border: 1px solid #e6e1ef; border-radius: 9px; background: #fff; color: #514975; padding: 7px 9px; font-size: 10px; }
+.pro-mode .welcome, .pro-mode .tabs, .pro-mode > .settings-panel, .pro-mode > footer { display: none; }
+.shell.pro-mode { padding-top: 10px; padding-bottom: 10px; }
+.pro-mode > .topbar { height: 24px; margin-bottom: 4px; }
+.pro-mode .pro-view { margin-top: 0; }
+.pro-console { border-radius: 17px; }
+.pro-console-header { min-height: 50px; gap: 12px; padding: 6px 14px; }
+.pro-brand-mark { width: 32px; height: 32px; border-radius: 10px; font-size: 17px; }
+.pro-brand strong { font-size: 11px; }
+.pro-brand small { font-size: 7px; }
+.pro-preset-control select { height: 31px; font-size: 10px; }
+.pro-preset-control button, .pro-fx-button, .pro-power { min-height: 31px; font-size: 8px; }
+.pro-power { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #504d66; border-radius: 8px; background: #222238; color: #b7b2c8; padding: 0 10px; font-size: 8px; font-weight: 900; letter-spacing: .8px; cursor: pointer; }
+.pro-power i { width: 7px; height: 7px; border-radius: 50%; background: #777287; }
+.pro-power.is-on { border-color: #3b8f70; color: #baf0d4; }
+.pro-power.is-on i { background: #62d99e; box-shadow: 0 0 8px #62d99e; }
+.pro-status-strip { min-height: 22px; padding-inline: 14px; font-size: 7px; }
+.pro-modules { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; padding: 8px; }
+.pro-oscillator { grid-column: span 2; }
+.pro-envelope-module, .pro-lfo-bank { grid-column: span 2; }
+.pro-envelope-module { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 0 10px; }
+.pro-envelope-module > .pro-module-heading { grid-column: 1 / -1; }
+.pro-keyboard-module { grid-column: 1 / -1; }
+.pro-module, .pro-lfo-bank, .pro-keyboard-module { border-radius: 12px; padding: 9px; }
+.pro-module-heading { gap: 7px; margin-bottom: 7px; }
+.pro-module-index { width: 28px; height: 28px; border-radius: 8px; font-size: 9px; }
+.pro-module-heading h3 { font-size: 10px; }
+.pro-module-heading p { font-size: 7px; }
+.pro-select { grid-template-columns: 1fr minmax(90px, 44%); margin-bottom: 9px; font-size: 7px; }
+.pro-select select { height: 24px; font-size: 8px; }
+.pro-oscillator .pro-select { margin-bottom: 5px; }
+.pro-knob-row { gap: 5px; }
+.pro-oscillator .pro-dial { width: 34px; height: 34px; }
+.pro-oscillator .pro-dial input { inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px); }
+.pro-oscillator .pro-dial::after { top: 3px; height: 6px; transform-origin: 1px 14px; }
+.pro-oscillator .pro-dial-face { width: 7px; height: 7px; }
+.pro-oscillator .pro-control-label { font-size: 6px; }
+.pro-oscillator .pro-control output { font-size: 7px; }
+.pro-control { gap: 3px; }
+.pro-control-label { font-size: 7px; letter-spacing: .5px; }
+.pro-dial { width: 43px; height: 43px; }
+.pro-dial::before { inset: -3px; border-width: 1.5px; }
+.pro-dial::after { top: 4px; height: 7px; transform-origin: 1px 18px; }
+.pro-dial-face { width: 9px; height: 9px; }
+.pro-dial input { inset: -5px; width: calc(100% + 10px); height: calc(100% + 10px); }
+.pro-control output { min-height: 12px; font-size: 8px; }
+.pro-inline-switch { margin-top: 4px; padding-top: 4px; gap: 5px; }
+.pro-inline-switch .pro-dial { width: 34px; height: 34px; }
+.pro-inline-switch .pro-dial::after { top: 3px; height: 6px; transform-origin: 1px 14px; }
+.pro-inline-switch .pro-toggle { font-size: 6px; }
+.pro-toggle { font-size: 7px; gap: 5px; }
+.pro-toggle-track { width: 25px; height: 14px; }
+.pro-toggle-track::after { width: 8px; height: 8px; }
+.pro-toggle input:checked + .pro-toggle-track::after { transform: translateX(11px); }
+.pro-envelope { padding: 8px 0 2px; }
+.pro-envelope-heading { margin-bottom: 7px; }
+.pro-envelope-heading h4, .pro-envelope-heading > span { font-size: 7px; }
+.pro-adsr-knobs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.pro-lfo-grid { gap: 7px; }
+.pro-lfo { padding: 5px; }
+.pro-lfo .pro-module-heading { margin-bottom: 4px; }
+.pro-lfo .pro-module-index { width: 22px; height: 22px; }
+.pro-lfo .pro-dial { width: 30px; height: 30px; }
+.pro-lfo .pro-dial input { inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px); }
+.pro-lfo .pro-dial::after { top: 3px; height: 5px; transform-origin: 1px 12px; }
+.pro-lfo .pro-dial-face { width: 6px; height: 6px; }
+.pro-lfo .pro-control output { min-height: 9px; font-size: 6px; }
+.pro-lfo .pro-mod-target { display: none; }
+.pro-lfo .pro-select { grid-template-columns: 35px minmax(0, 1fr); margin-bottom: 4px; }
+.pro-lfo .pro-select select { height: 22px; }
+.pro-lfo .pro-knob-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pro-mod-target { margin-top: 5px; font-size: 7px; }
+.pro-section-heading { margin-bottom: 8px; }
+.pro-section-heading h3 { font-size: 12px; }
+.pro-section-heading p, .pro-section-heading > span { font-size: 7px; }
+.pro-keys { height: 60px; margin-top: 2px; }
+.pro-keys .white-key { padding-bottom: 4px; font-size: 7px; }
+.pro-keys .black-key { height: 67%; }
+.pro-keyboard-module .pro-section-heading { margin-bottom: 5px; }
+.pro-midi-controls { display: flex; align-items: center; gap: 5px; margin-top: 4px; border-top: 1px solid #46425d; padding-top: 4px; }
+.pro-midi-controls > label:first-child { color: #aaa5c0; font-size: 7px; font-weight: 800; letter-spacing: .7px; }
+.pro-midi-controls select, .pro-routing-controls select { min-width: 0; height: 23px; border: 1px solid #4d4965; border-radius: 7px; background: #222238; color: #f7f5ff; padding: 0 6px; font: inherit; font-size: 7px; }
+.pro-midi-controls select { flex: 1; }
+.pro-midi-controls > button, .pro-routing-controls > button { height: 23px; border: 1px solid #5b5383; border-radius: 7px; background: #403b5d; color: #e7e0ff; padding: 0 8px; font-size: 7px; font-weight: 900; cursor: pointer; }
+.pro-midi-controls > button:disabled { opacity: .4; cursor: not-allowed; }
+.pro-midi-controls #pro-midi-status { overflow: hidden; max-width: 145px; color: #aaa5c0; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
+.pro-midi-controls .pro-toggle { flex: 0 0 auto; }
+.pro-console-footer { min-height: 30px; padding: 4px 13px; font-size: 7px; }
+.pro-console-footer button { font-size: 7px; }
+.pro-fx-layout { padding: 10px; }
+.pro-fx-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.pro-fx-module { min-height: 119px; padding: 9px; }
+.pro-fx-module .pro-module-heading { gap: 6px; margin-bottom: 8px; }
+.pro-fx-module .pro-module-index { width: 24px; height: 24px; }
+.pro-fx-module .pro-module-heading h3 { font-size: 8px; letter-spacing: .6px; }
+.pro-fx-module .pro-module-heading p { font-size: 6px; }
+.pro-fx-module .pro-toggle { gap: 4px; font-size: 6px; }
+.pro-fx-module .pro-toggle-track { width: 22px; height: 13px; }
+.pro-fx-module .pro-toggle-track::after { top: 2px; width: 7px; height: 7px; }
+.pro-fx-module .pro-toggle input:checked + .pro-toggle-track::after { transform: translateX(10px); }
+.pro-fx-module .pro-knob-row { grid-template-columns: repeat(var(--fx-controls, 3), minmax(0, 1fr)); gap: 3px; }
+.pro-fx-module:has(.pro-control:nth-child(4)) .pro-knob-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.pro-fx-module:has(.pro-control:nth-child(5)) .pro-knob-row { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.pro-fx-module .pro-control-label { font-size: 6px; letter-spacing: .2px; }
+.pro-fx-module .pro-dial { width: 34px; height: 34px; }
+.pro-fx-module .pro-dial input { inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px); }
+.pro-fx-module .pro-dial::after { top: 3px; height: 6px; transform-origin: 1px 14px; }
+.pro-fx-module .pro-dial-face { width: 7px; height: 7px; }
+.pro-fx-module .pro-control output { font-size: 7px; }
+.pro-routing-module { margin-top: 8px; padding: 9px 11px; }
+.pro-routing-module .pro-module-heading { margin-bottom: 7px; }
+.pro-routing-controls { display: flex; align-items: center; gap: 7px; }
+.pro-routing-controls label { display: flex; align-items: center; gap: 5px; color: #aaa5c0; font-size: 7px; font-weight: 800; }
+.pro-routing-controls select { min-width: 100px; }
+.pro-routing-controls > span { color: #74dce8; font-size: 11px; }
+.pro-route-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
+.pro-route-row { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #49455f; border-radius: 6px; background: #25243a; color: #c8c4d8; padding: 3px 4px 3px 6px; font-size: 7px; }
+.pro-route-row button { width: 14px; height: 14px; border: 0; border-radius: 4px; background: #433d56; color: #ffaaa0; font-size: 10px; line-height: 1; cursor: pointer; }
+.pro-route-message { min-height: 10px; margin: 3px 0 0; color: #91ddb6; font-size: 7px; }
+.pro-fx-chain-label { color: #aaa5c0; font-size: 8px; font-weight: 800; letter-spacing: 1px; }
+.pro-fx-console .pro-brand-mark { background: linear-gradient(140deg, #63cddd, #8068dc); font-size: 11px; }
+.pro-fx-console .pro-fx-button.active { border-color: #8068dc; background: #6554b2; }
+
+@media (max-width: 850px) {
+  .pro-modules { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pro-oscillator, .pro-envelope-module, .pro-lfo-bank { grid-column: span 1; }
+  .pro-envelope-module, .pro-lfo-bank, .pro-keyboard-module { grid-column: 1 / -1; }
+}
+
+@media (max-width: 650px) {
+  .pro-modules { grid-template-columns: 1fr; }
+  .pro-oscillator, .pro-envelope-module, .pro-lfo-bank, .pro-keyboard-module { grid-column: auto; }
+  .pro-envelope-module { display: block; }
+  .pro-fx-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pro-fx-module:has(.pro-control:nth-child(5)) .pro-knob-row { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .pro-midi-controls { flex-wrap: wrap; }
+  .pro-midi-controls select { flex: 1 1 140px; }
+  .pro-midi-controls #pro-midi-status { max-width: 100%; }
+  .pro-routing-controls { flex-wrap: wrap; }
+  .pro-routing-controls label { flex: 1 1 38%; }
+  .pro-routing-controls select { flex: 1; min-width: 60px; }
 }
